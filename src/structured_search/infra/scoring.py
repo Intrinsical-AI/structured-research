@@ -117,9 +117,7 @@ class HeuristicScorer(ScoringPort):
         failures: list[str] = []
         evidence_fields = {e.field for e in record.evidence}
         for required in self.config.gates.required_evidence_fields:
-            if required not in evidence_fields and not any(
-                required.startswith(f"{ef}.") for ef in evidence_fields
-            ):
+            if not any(self._field_path_matches(required, ef) for ef in evidence_fields):
                 failures.append(f"missing_evidence: {required}")
         return failures
 
@@ -239,14 +237,11 @@ class HeuristicScorer(ScoringPort):
 
         Distinction between absent vs explicit null:
             _MISSING (key not in dict): neutral_if_na applies → None or False
-            None     (explicit null):   always False — data was attempted but missing;
-                                        never satisfies a condition, never neutral for gates
+            None     (explicit null):   neutral_if_na applies → None or False
         """
         value = self._get_nested(record.model_dump(), rule.field)
-        if value is _MISSING:
+        if value in (_MISSING, None):
             return None if rule.neutral_if_na else False
-        if value is None:
-            return False
         op = rule.op
         if op in {"=", "in", "contains_any", "contains_all", "weighted"}:
             return self._evaluate_non_numeric_operator(value, rule)
@@ -305,6 +300,14 @@ class HeuristicScorer(ScoringPort):
     @staticmethod
     def _is_numeric(value: Any) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    @staticmethod
+    def _field_path_matches(required: str, evidence_field: str) -> bool:
+        if required == evidence_field:
+            return True
+        return required.startswith(f"{evidence_field}.") or evidence_field.startswith(
+            f"{required}."
+        )
 
     def _safe_compare(
         self,

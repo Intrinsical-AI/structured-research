@@ -74,6 +74,7 @@ class TolerantJSONLParser:
                 continue
 
             # Fast path: single-line parse
+            single_line_error: str | None = None
             try:
                 obj = json.loads(line)
                 if not isinstance(obj, dict):
@@ -90,8 +91,24 @@ class TolerantJSONLParser:
                     valid.append(ParsedRecord(i + 1, obj, consumed_lines=1))
                 i += 1
                 continue
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                single_line_error = str(exc)
+
+            # Only attempt multiline recovery when the starting line plausibly
+            # belongs to a continued object. This avoids swallowing subsequent
+            # valid JSONL records after a malformed standalone line like "{".
+            if not self._should_attempt_multiline(lines, i):
+                errors.append(
+                    ParseError(
+                        i + 1,
+                        line[:200],
+                        "json_parse",
+                        single_line_error or "Invalid JSON object",
+                        consumed_lines=1,
+                    )
+                )
+                i += 1
+                continue
 
             # Slow path: brace-depth accumulation for multi-line records
             obj, consumed, err = self._try_multiline(lines, i, max_continuation_lines)
@@ -110,6 +127,45 @@ class TolerantJSONLParser:
             i += max(consumed, 1)
 
         return valid, errors
+
+    def _should_attempt_multiline(self, lines: list[str], start: int) -> bool:
+        """Heuristic guard before multiline recovery.
+
+        We only try multiline mode if:
+        - the current line starts an object ('{')
+        - brace depth after scanning the line is still open (>0)
+        - and for a bare '{', the next non-empty line does not look like
+          a brand-new JSONL record start.
+        """
+        first = lines[start].lstrip()
+        if not first.startswith("{"):
+            return False
+
+        depth, _, _ = self._scan_line_state(
+            line=first,
+            depth=0,
+            in_string=False,
+            escape_next=False,
+        )
+        if depth <= 0:
+            return False
+
+        if first.strip() == "{":
+            next_non_empty = self._next_non_empty_line(lines, start + 1)
+            if next_non_empty is None:
+                return False
+            if next_non_empty.lstrip().startswith("{"):
+                return False
+
+        return True
+
+    @staticmethod
+    def _next_non_empty_line(lines: list[str], start: int) -> str | None:
+        for idx in range(start, len(lines)):
+            candidate = lines[idx].strip()
+            if candidate:
+                return candidate
+        return None
 
     def _try_multiline(
         self, lines: list[str], start: int, max_lines: int

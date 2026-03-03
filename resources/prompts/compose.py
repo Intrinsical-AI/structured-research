@@ -15,14 +15,10 @@ from pathlib import Path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Compose USAT prompt from modular parts"
-    )
+    parser = argparse.ArgumentParser(description="Compose USAT prompt from modular parts")
     parser.add_argument("--task", required=True, help="Task name (e.g., job_search)")
     parser.add_argument("--step", required=True, help="Step code (S0, S1, S2, or S3)")
-    parser.add_argument(
-        "--output", default=None, help="Output file path (default: stdout)"
-    )
+    parser.add_argument("--output", default=None, help="Output file path (default: stdout)")
     parser.add_argument("--no-base", action="store_true", help="Omit base layers")
     args = parser.parse_args()
 

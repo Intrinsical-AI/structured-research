@@ -1,7 +1,7 @@
 """Config loader: maps task.json / task_config.json to runtime configs.
 
 The task.json stores scoring gates and soft-scoring parameters in a human-
-editable format (e.g. hard_filters_mode: "any").  This module converts that
+editable format. This module converts that
 format to the SoftScoringConfig dataclasses used by HeuristicScorer so
 the runtime config always reflects the profile config instead of hardcoded
 defaults.
@@ -93,21 +93,12 @@ def collect_model_field_paths(
     return frozenset(paths)
 
 
-# task.json uses short aliases; GatesConfig uses the full Literal values
-_MODE_ALIASES: dict[str, str] = {
-    "any": "require_any",
-    "all": "require_all",
-    "require_any": "require_any",
-    "require_all": "require_all",
-}
-
-
 class TaskGatesInput(BaseModel):
     """Validated task.gates payload."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
-    hard_filters_mode: Literal["any", "all", "require_any", "require_all"] = "require_all"
+    hard_filters_mode: Literal["require_any", "require_all"] = "require_all"
     hard_filters: list[ConstraintRule] = Field(default_factory=list)
     reject_anomalies: list[str] = Field(default_factory=list)
     required_evidence_fields: list[str] = Field(default_factory=list)
@@ -177,11 +168,8 @@ def task_json_to_scoring_config(task: dict | TaskRuntimeConfig) -> SoftScoringCo
         task if isinstance(task, TaskRuntimeConfig) else TaskRuntimeConfig.model_validate(task)
     )
 
-    # --- gates ---
-    hard_filters_mode = _MODE_ALIASES[task_input.gates.hard_filters_mode]
-
     gates = GatesConfig(
-        hard_filters_mode=hard_filters_mode,  # type: ignore[arg-type]
+        hard_filters_mode=task_input.gates.hard_filters_mode,
         hard_filters=task_input.gates.hard_filters,
         reject_anomalies=task_input.gates.reject_anomalies,
         required_evidence_fields=task_input.gates.required_evidence_fields,

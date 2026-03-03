@@ -42,23 +42,23 @@ class ProfileRepository(ABC):
     """Port for profile bundle persistence."""
 
     @abstractmethod
-    def list_profiles(self) -> list[ProfileRecord]:
-        """Return discoverable profiles with listing metadata."""
+    def list_profiles(self, task_id: str) -> list[ProfileRecord]:
+        """Return discoverable profiles for one task."""
         raise NotImplementedError
 
     @abstractmethod
-    def load_bundle(self, profile_id: str) -> BundleData:
-        """Load a profile bundle by id."""
+    def load_bundle(self, task_id: str, profile_id: str) -> BundleData:
+        """Load a task/profile bundle by id."""
         raise NotImplementedError
 
     @abstractmethod
-    def save_bundle(self, profile_id: str, bundle: BundleData) -> None:
-        """Persist a profile bundle by id."""
+    def save_bundle(self, task_id: str, profile_id: str, bundle: BundleData) -> None:
+        """Persist a task/profile bundle by id."""
         raise NotImplementedError
 
     @abstractmethod
-    def atoms_dir(self, profile_id: str) -> Path:
-        """Return atoms directory for a profile."""
+    def atoms_dir(self, task_id: str, profile_id: str) -> Path:
+        """Return atoms directory for one task/profile."""
         raise NotImplementedError
 
 

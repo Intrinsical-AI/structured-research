@@ -80,7 +80,7 @@ class PromptComposer:
 
         Args:
             task: Task name (e.g. 'job_search').
-            profile: Profile name (e.g. 'profile_1').
+            profile: Profile name (e.g. 'profile_example').
 
         Returns:
             Content of <task>/profiles/<profile>/context.md, or empty string.

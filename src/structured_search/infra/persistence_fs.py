@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from structured_search.ports.persistence import (
 )
 
 logger = logging.getLogger(__name__)
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -38,15 +40,23 @@ def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
 
 
 class FilesystemProfileRepository(ProfileRepository):
-    """ProfileRepository backed by config/job_search/*/bundle.json."""
+    """ProfileRepository backed by config/<task_id>/<profile_id>/bundle.json."""
 
     _BUNDLE_FILENAME = "bundle.json"
 
     def __init__(self, base_dir: Path | str):
         self.base_dir = Path(base_dir)
 
-    def _bundle_path(self, profile_id: str) -> Path:
-        return self.base_dir / profile_id / self._BUNDLE_FILENAME
+    @staticmethod
+    def _validate_slug(kind: str, value: str) -> str:
+        if not _SAFE_ID_RE.match(value):
+            raise ValueError(f"Invalid {kind} {value!r}: allowed pattern is {_SAFE_ID_RE.pattern}")
+        return value
+
+    def _bundle_path(self, task_id: str, profile_id: str) -> Path:
+        safe_task = self._validate_slug("task_id", task_id)
+        safe_profile = self._validate_slug("profile_id", profile_id)
+        return self.base_dir / safe_task / safe_profile / self._BUNDLE_FILENAME
 
     def _payload_to_bundle_data(
         self,
@@ -79,12 +89,13 @@ class FilesystemProfileRepository(ProfileRepository):
             result_schema=payload.get("result_schema"),
         )
 
-    def list_profiles(self) -> list[ProfileRecord]:
-        if not self.base_dir.exists():
+    def list_profiles(self, task_id: str = "job_search") -> list[ProfileRecord]:
+        task_dir = self.base_dir / self._validate_slug("task_id", task_id)
+        if not task_dir.exists():
             return []
 
         profiles: list[ProfileRecord] = []
-        for profile_dir in sorted(p for p in self.base_dir.iterdir() if p.is_dir()):
+        for profile_dir in sorted(p for p in task_dir.iterdir() if p.is_dir()):
             bundle_path = profile_dir / self._BUNDLE_FILENAME
             if not bundle_path.is_file():
                 continue
@@ -109,15 +120,39 @@ class FilesystemProfileRepository(ProfileRepository):
             )
         return profiles
 
-    def load_bundle(self, profile_id: str) -> BundleData:
-        bundle_path = self._bundle_path(profile_id)
+    def load_bundle(
+        self,
+        task_id: str,
+        profile_id: str | None = None,
+    ) -> BundleData:
+        # Compatibility mode: load_bundle(profile_id)
+        if profile_id is None:
+            profile_id = task_id
+            task_id = "job_search"
+        bundle_path = self._bundle_path(task_id, profile_id)
         if not bundle_path.is_file():
-            raise FileNotFoundError(f"Profile not found: {profile_id!r} (expected {bundle_path})")
+            raise FileNotFoundError(
+                f"Profile not found: task={task_id!r} profile={profile_id!r} "
+                f"(expected {bundle_path})"
+            )
         payload = _read_json(bundle_path)
         return self._payload_to_bundle_data(profile_id, payload)
 
-    def save_bundle(self, profile_id: str, bundle: BundleData) -> None:
+    def save_bundle(
+        self,
+        task_id: str,
+        profile_id: str | BundleData,
+        bundle: BundleData | None = None,
+    ) -> None:
+        # Compatibility mode: save_bundle(profile_id, bundle)
+        if bundle is None and isinstance(profile_id, BundleData):
+            bundle = profile_id
+            profile_id = task_id
+            task_id = "job_search"
+        if bundle is None:
+            raise TypeError("save_bundle() missing required bundle argument")
         payload = {
+            "task_id": task_id,
             "profile_id": profile_id,
             "constraints": bundle.constraints,
             "task": bundle.task,
@@ -126,10 +161,16 @@ class FilesystemProfileRepository(ProfileRepository):
             "domain_schema": bundle.domain_schema,
             "result_schema": bundle.result_schema,
         }
-        _write_json(self._bundle_path(profile_id), payload)
+        _write_json(self._bundle_path(task_id, profile_id), payload)
 
-    def atoms_dir(self, profile_id: str) -> Path:
-        return self.base_dir / profile_id / "atoms"
+    def atoms_dir(self, task_id: str, profile_id: str | None = None) -> Path:
+        # Compatibility mode: atoms_dir(profile_id)
+        if profile_id is None:
+            profile_id = task_id
+            task_id = "job_search"
+        safe_task = self._validate_slug("task_id", task_id)
+        safe_profile = self._validate_slug("profile_id", profile_id)
+        return self.base_dir / safe_task / safe_profile / "atoms"
 
 
 class FilesystemRunRepository(RunRepository):
