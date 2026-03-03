@@ -1,0 +1,9 @@
+id: claim_1
+type: claim
+parent_context_id: ctx_1
+defensibility:
+  verification_level: 1
+  evidence_ids: [ev_1]
+variants:
+  technical: "Reduced latency of LLM inference backend by 40% using vLLM."
+  short: "Reduced LLM latency by 40% with vLLM."

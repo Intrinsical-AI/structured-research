@@ -1,0 +1,5 @@
+id: ctx_1
+type: context
+domain: job_search
+tags: [career, achievement]
+content: "The candidate has demonstrated exceptional skill optimizing LLMs locally, reducing inference costs by substantial margins."

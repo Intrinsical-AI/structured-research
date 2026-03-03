@@ -1,0 +1,45 @@
+{
+  "agent_name": "AGENT_NAME",
+  "version": "1.2.0",
+  "language_priority": ["en"],
+  "max_results": 50,
+  "target_results": [15, 30],
+  "evidence_required": true,
+  "time_window_days": 30,
+  "explain_mode": "concise",
+  "budget": {
+    "pages_max": 300,
+    "time_minutes_max": 30
+  },
+  "mode": "guided",
+  "runtime": {
+    "llm": {
+      "temperature": 0,
+      "top_p": 1,
+      "seed": 42
+    },
+    "stable_input_order_keys": [
+      "source_priority",
+      "posted_at",
+      "entity",
+      "title",
+      "apply_url"
+    ]
+  },
+  "capabilities_required": {
+    "web_browse": true,
+    "http_fetch": true,
+    "html_parse": true,
+    "pdf_parse": true,
+    "json_io": true,
+    "external_scoring": true
+  },
+  "artifacts": {
+    "features": "features.jsonl",
+    "scored_results": "scored_results.jsonl",
+    "scoring_metrics": "scoring_metrics.json",
+    "results": "results.jsonl",
+    "metrics": "metrics.json",
+    "review": "review.md"
+  }
+}

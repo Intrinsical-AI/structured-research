@@ -1,0 +1,1241 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "structured-search API",
+    "description": "HTTP API for structured, auditable search workflows.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/v1/job-search/profiles": {
+      "get": {
+        "summary": "List available job_search profiles",
+        "operationId": "get_profiles_v1_job_search_profiles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileSummary"
+                  },
+                  "type": "array",
+                  "title": "Response Get Profiles V1 Job Search Profiles Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-search/profiles/{profile_id}/bundle": {
+      "get": {
+        "summary": "Load a profile bundle (constraints + task + task_config + optional sections)",
+        "operationId": "get_bundle_v1_job_search_profiles__profile_id__bundle_get",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileBundle"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Validate and save a profile bundle",
+        "operationId": "put_bundle_v1_job_search_profiles__profile_id__bundle_put",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileBundle"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleWriteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-search/prompt/generate": {
+      "post": {
+        "summary": "Compose an extraction prompt for a profile and step",
+        "operationId": "post_generate_prompt_v1_job_search_prompt_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-search/jsonl/validate": {
+      "post": {
+        "summary": "Parse JSONL tolerantly and validate records against JobPosting schema",
+        "operationId": "post_jsonl_validate_v1_job_search_jsonl_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonlValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonlValidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-search/run/validate": {
+      "post": {
+        "summary": "Dry-run validation for /run prerequisites without scoring",
+        "operationId": "post_run_validate_v1_job_search_run_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunValidateSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found"
+          },
+          "422": {
+            "description": "Validation/config error in request or profile task"
+          }
+        }
+      }
+    },
+    "/v1/job-search/run": {
+      "post": {
+        "summary": "Score pre-validated records using profile task config",
+        "operationId": "post_run_v1_job_search_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunScoreResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found"
+          },
+          "422": {
+            "description": "Validation/config error in request or profile task"
+          },
+          "500": {
+            "description": "Run failed (e.g. required snapshot write failure)"
+          }
+        }
+      }
+    },
+    "/v1/gen-cv": {
+      "post": {
+        "summary": "Generate a CV markdown and structured JSON",
+        "operationId": "post_gen_cv_v1_gen_cv_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenCVRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenCVResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found"
+          },
+          "422": {
+            "description": "Validation error in request payload"
+          },
+          "503": {
+            "description": "CV provider unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BundleWriteResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "BundleWriteResponse",
+        "description": "HTTP response body for PUT /v1/job-search/profiles/{id}/bundle."
+      },
+      "CvCandidateInput": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "seniority": {
+            "type": "string",
+            "title": "Seniority"
+          },
+          "tech_stack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CvSkillSetInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "experience": {
+            "items": {
+              "$ref": "#/components/schemas/CvExperienceInput"
+            },
+            "type": "array",
+            "title": "Experience"
+          },
+          "education": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Education"
+          },
+          "spoken_languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Spoken Languages"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "availability_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability Days"
+          },
+          "role_focus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Role Focus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seniority"
+        ],
+        "title": "CvCandidateInput",
+        "description": "External candidate payload for POST /v1/gen-cv."
+      },
+      "CvExperienceInput": {
+        "properties": {
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Highlights"
+          },
+          "stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stack"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company",
+          "title"
+        ],
+        "title": "CvExperienceInput",
+        "description": "External candidate experience entry for POST /v1/gen-cv."
+      },
+      "CvSkillSetInput": {
+        "properties": {
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "frameworks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Frameworks"
+          },
+          "platforms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Platforms"
+          },
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Domains"
+          }
+        },
+        "type": "object",
+        "title": "CvSkillSetInput",
+        "description": "External candidate skill shape for POST /v1/gen-cv."
+      },
+      "GenCVRequest": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "job": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Job"
+          },
+          "candidate_profile": {
+            "$ref": "#/components/schemas/CvCandidateInput"
+          },
+          "selected_claim_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Claim Ids"
+          },
+          "llm_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model"
+          },
+          "allow_mock_fallback": {
+            "type": "boolean",
+            "title": "Allow Mock Fallback",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "job",
+          "candidate_profile"
+        ],
+        "title": "GenCVRequest",
+        "description": "Request body for POST /v1/gen-cv."
+      },
+      "GenCVResponse": {
+        "properties": {
+          "cv_markdown": {
+            "type": "string",
+            "title": "Cv Markdown"
+          },
+          "generated_cv_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated Cv Json"
+          },
+          "model_info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cv_markdown"
+        ],
+        "title": "GenCVResponse",
+        "description": "Response from POST /v1/gen-cv."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestError": {
+        "properties": {
+          "line_no": {
+            "type": "integer",
+            "title": "Line No"
+          },
+          "raw_preview": {
+            "type": "string",
+            "title": "Raw Preview"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "json_parse",
+              "not_object",
+              "schema_validation"
+            ],
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_no",
+          "raw_preview",
+          "kind",
+          "message"
+        ],
+        "title": "IngestError",
+        "description": "A single record-level error from JSONL ingestion."
+      },
+      "JsonlInvalidRecord": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "raw": {
+            "type": "string",
+            "title": "Raw"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "json_parse",
+              "not_object",
+              "schema_validation"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "error",
+          "raw",
+          "kind"
+        ],
+        "title": "JsonlInvalidRecord",
+        "description": "Invalid record payload shape returned by /v1/job-search/jsonl/validate."
+      },
+      "JsonlValidateMetrics": {
+        "properties": {
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "json_valid_lines": {
+            "type": "integer",
+            "title": "Json Valid Lines"
+          },
+          "schema_valid_records": {
+            "type": "integer",
+            "title": "Schema Valid Records"
+          },
+          "invalid_lines": {
+            "type": "integer",
+            "title": "Invalid Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_lines",
+          "json_valid_lines",
+          "schema_valid_records",
+          "invalid_lines"
+        ],
+        "title": "JsonlValidateMetrics",
+        "description": "Validation metrics returned by /v1/job-search/jsonl/validate."
+      },
+      "JsonlValidateRequest": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "raw_jsonl": {
+            "type": "string",
+            "title": "Raw Jsonl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "raw_jsonl"
+        ],
+        "title": "JsonlValidateRequest",
+        "description": "Request body for POST /v1/job-search/jsonl/validate."
+      },
+      "JsonlValidateResponse": {
+        "properties": {
+          "valid_records": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Valid Records"
+          },
+          "invalid_records": {
+            "items": {
+              "$ref": "#/components/schemas/JsonlInvalidRecord"
+            },
+            "type": "array",
+            "title": "Invalid Records"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/JsonlValidateMetrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid_records",
+          "invalid_records",
+          "metrics"
+        ],
+        "title": "JsonlValidateResponse",
+        "description": "HTTP response body for POST /v1/job-search/jsonl/validate."
+      },
+      "ProfileBundle": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "constraints": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Constraints"
+          },
+          "task": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Task"
+          },
+          "task_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Task Config"
+          },
+          "user_profile": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Profile"
+          },
+          "domain_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Schema"
+          },
+          "result_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Schema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "constraints",
+          "task",
+          "task_config"
+        ],
+        "title": "ProfileBundle",
+        "description": "All editable config for one search profile."
+      },
+      "ProfileSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updated_at"
+        ],
+        "title": "ProfileSummary",
+        "description": "Summary item from GET /v1/job-search/profiles."
+      },
+      "PromptGenerateRequest": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "step": {
+            "type": "string",
+            "title": "Step",
+            "default": "S3_execute"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id"
+        ],
+        "title": "PromptGenerateRequest",
+        "description": "Request body for POST /v1/job-search/prompt/generate."
+      },
+      "PromptGenerateResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "constraints_embedded": {
+            "type": "boolean",
+            "title": "Constraints Embedded"
+          },
+          "prompt_hash": {
+            "type": "string",
+            "title": "Prompt Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "step",
+          "prompt",
+          "constraints_embedded",
+          "prompt_hash"
+        ],
+        "title": "PromptGenerateResponse",
+        "description": "HTTP response body for POST /v1/job-search/prompt/generate."
+      },
+      "RunResponseMetrics": {
+        "properties": {
+          "loaded": {
+            "type": "integer",
+            "title": "Loaded"
+          },
+          "processed": {
+            "type": "integer",
+            "title": "Processed"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "type": "string",
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loaded",
+          "processed",
+          "skipped",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "RunResponseMetrics",
+        "description": "Response metrics from POST /v1/job-search/run."
+      },
+      "RunScoreRequest": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "records": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Records"
+          },
+          "require_snapshot": {
+            "type": "boolean",
+            "title": "Require Snapshot",
+            "description": "If true, snapshot persistence is mandatory. Run fails when snapshot write fails.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "records"
+        ],
+        "title": "RunScoreRequest",
+        "description": "Request body for POST /v1/job-search/run (canonical)."
+      },
+      "RunScoreResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "scored_records": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Scored Records"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/RunResponseMetrics"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "snapshot_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Dir"
+          },
+          "snapshot_status": {
+            "type": "string",
+            "enum": [
+              "written",
+              "failed"
+            ],
+            "title": "Snapshot Status",
+            "default": "written"
+          },
+          "snapshot_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "profile_id",
+          "scored_records",
+          "metrics",
+          "errors"
+        ],
+        "title": "RunScoreResponse",
+        "description": "HTTP response body for POST /v1/job-search/run."
+      },
+      "RunValidateChecks": {
+        "properties": {
+          "profile_exists": {
+            "type": "boolean",
+            "title": "Profile Exists"
+          },
+          "constraints_valid": {
+            "type": "boolean",
+            "title": "Constraints Valid"
+          },
+          "scoring_config_valid": {
+            "type": "boolean",
+            "title": "Scoring Config Valid"
+          },
+          "all_records_schema_valid": {
+            "type": "boolean",
+            "title": "All Records Schema Valid"
+          },
+          "snapshot_io_checked": {
+            "type": "boolean",
+            "title": "Snapshot Io Checked",
+            "default": false
+          },
+          "snapshot_io_writable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Io Writable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_exists",
+          "constraints_valid",
+          "scoring_config_valid",
+          "all_records_schema_valid"
+        ],
+        "title": "RunValidateChecks",
+        "description": "Validation checks executed by dry-run validation for /v1/job-search/run."
+      },
+      "RunValidateSummary": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "total_records": {
+            "type": "integer",
+            "title": "Total Records"
+          },
+          "valid_records": {
+            "type": "integer",
+            "title": "Valid Records"
+          },
+          "invalid_records": {
+            "type": "integer",
+            "title": "Invalid Records"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/IngestError"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/RunValidateChecks"
+          },
+          "snapshot_probe_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Probe Dir"
+          },
+          "snapshot_probe_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Probe Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "profile_id",
+          "total_records",
+          "valid_records",
+          "invalid_records",
+          "errors",
+          "checks"
+        ],
+        "title": "RunValidateSummary",
+        "description": "Dry-run summary for validating whether /v1/job-search/run can execute."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationIssue": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "default": "error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssue",
+        "description": "A single validation problem with JSON-path context."
+      }
+    }
+  }
+}

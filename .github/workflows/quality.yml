@@ -1,0 +1,53 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync dependencies
+        run: uv sync --group dev --extra api
+
+      - name: Backend lint
+        run: uv run structured-search quality lint
+
+      - name: Architectural lint
+        run: uv run lint-imports
+
+      - name: Backend test suite
+        run: uv run pytest -q
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: UI lint
+        working-directory: ui
+        run: npm run lint
+
+      - name: UI test suite
+        working-directory: ui
+        run: npm test

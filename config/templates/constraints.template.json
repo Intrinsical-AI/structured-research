@@ -1,0 +1,64 @@
+{
+  "domain": "<task_name>",
+  "sources": {
+    "primary": ["source_a", "source_b"],
+    "secondary": ["source_c"],
+    "fallback": ["source_d"]
+  },
+  "must": [
+    {
+      "field": "field.path",
+      "op": "in",
+      "value": ["value_a", "value_b"]
+    }
+  ],
+  "prefer": [
+    {
+      "field": "field.path",
+      "op": "contains_any",
+      "value": ["value_a", "value_b"],
+      "weight": 0.8
+    },
+    {
+      "field": "recency.activity_age_days",
+      "op": "<=",
+      "value": 30,
+      "time_decay_half_life_days": 10
+    }
+  ],
+  "avoid": [
+    {
+      "field": "field.path",
+      "op": "=",
+      "value": true
+    }
+  ],
+  "limits": {
+    "hard_max_per_entity": 3,
+    "hard_max_per_location": 40
+  },
+  "relaxation": {
+    "order": ["sources", "recency", "region", "seniority", "salary"],
+    "steps": {
+      "sources": {
+        "add": ["extra_source_a", "extra_source_b"],
+        "max_new_sources": 2
+      },
+      "recency": {
+        "from_days": 30,
+        "to_days": 45,
+        "step": 7
+      },
+      "region": {
+        "add": ["fallback-region"]
+      },
+      "seniority": {
+        "expand": ["expanded-level"]
+      },
+      "salary": {
+        "widen_pct": 30
+      }
+    },
+    "emit_constraints_diff": true
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "agent_name": "AGENT_NAME",
+  "version": "1.2.0",
+  "gates": {
+    "must_pass_constraints_must": true,
+    "hard_filters_mode": "any",
+    "hard_filters": [
+      {
+        "field": "field.path",
+        "op": "contains_any",
+        "value": ["value_a", "value_b"],
+        "reason": "hard_gate_reason"
+      }
+    ],
+    "reject_anomalies": ["prompt_injection_suspected"],
+    "required_evidence_fields": ["entity", "title", "posted_at", "apply_url"]
+  },
+  "soft_scoring": {
+    "formula_version": "v2_soft_after_gates",
+    "prefer_weight_default": 1.0,
+    "avoid_penalty_default": 1.0,
+    "signal_boost": {},
+    "penalties": {
+      "incomplete": 0.2,
+      "inference_used": 0.05
+    }
+  },
+  "deterministic_scoring": {
+    "engine": "scripts/score_<task_name>.py",
+    "input_artifact": "features.jsonl",
+    "output_artifact": "scored_results.jsonl",
+    "metrics_artifact": "scoring_metrics.json",
+    "normalization": "clamp_0_10"
+  },
+  "normalization": {
+    "title": [
+      {
+        "match": ["raw_title_a", "raw_title_b"],
+        "as": "canonical_title"
+      }
+    ],
+    "entity": {},
+    "salary_currency": ["EUR", "USD"],
+    "location_timezone_gate": "UTC+/-3"
+  },
+  "dedupe": {
+    "primary_by": ["entity", "apply_url"],
+    "fallback_by": ["entity", "title", "location"]
+  }
+}

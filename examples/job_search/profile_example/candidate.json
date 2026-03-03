@@ -1,0 +1,70 @@
+{
+    "id": "cand_123",
+    "name": "Jane Example Doe",
+    "seniority": "senior",
+    "tech_stack": {
+        "languages": [
+            "Python",
+            "TypeScript",
+            "Go"
+        ],
+        "frameworks": [
+            "FastAPI",
+            "React",
+            "Next.js"
+        ],
+        "platforms": [
+            "AWS",
+            "Vercel"
+        ],
+        "domains": [
+            "AI Engineering",
+            "Backend",
+            "Fullstack"
+        ]
+    },
+    "experience": [
+        {
+            "company": "Acme Corp",
+            "title": "Senior AI Engineer",
+            "duration_months": 36,
+            "highlights": [
+                "Architected scalable LLM inference pipelines processing 1M tokens/day",
+                "Reduced latency by 40% through vLLM integration"
+            ],
+            "stack": [
+                "Python",
+                "FastAPI",
+                "Ollama"
+            ]
+        },
+        {
+            "company": "Startup Inc",
+            "title": "Fullstack Developer",
+            "duration_months": 24,
+            "highlights": [
+                "Built customer-facing React dashboard with Next.js",
+                "Integrated Stripe for billing automation"
+            ],
+            "stack": [
+                "TypeScript",
+                "Next.js",
+                "PostgreSQL"
+            ]
+        }
+    ],
+    "education": [
+        "BSc Computer Science, Example University"
+    ],
+    "spoken_languages": [
+        "English",
+        "Spanish"
+    ],
+    "location": "Madrid, Spain",
+    "timezone": "Europe/Madrid",
+    "availability_days": 15,
+    "role_focus": [
+        "AI Engineer",
+        "Senior Backend Engineer"
+    ]
+}

@@ -1,0 +1,21 @@
+{
+  "timezone": "Region/City",
+  "mobility": "local/regional/global",
+  "risk_tolerance": "low|medium|high",
+  "currency_default": "EUR",
+  "work_authorization_required_for_user": false,
+  "language_preference": ["en"],
+  "role_focus": ["ROLE_A", "ROLE_B"],
+  "seniority": ["mid", "senior"],
+  "tech_stack": ["TECH_A", "TECH_B"],
+  "process_preferences": {
+    "prefer_startup": true,
+    "prefer_enterprise": true,
+    "prefer_take_home": true,
+    "avoid_whiteboard_only": false
+  },
+  "commute_policy": {
+    "max_hybrid_days_per_week": 2
+  },
+  "availability_days": 14
+}

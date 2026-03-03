@@ -1,0 +1,10 @@
+id: ev_1
+type: evidence
+visibility: public
+is_placeholder: false
+url: "https://example.com/portfolio/case-study-vllm"
+metadata:
+  quote: "we achieved a 40% bump in speed"
+  locator:
+    type: url_fragment
+    value: "#results"

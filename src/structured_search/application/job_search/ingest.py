@@ -1,0 +1,60 @@
+"""Application use-case for tolerant JSONL parsing + schema validation."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from pydantic import ValidationError
+
+from structured_search.contracts import IngestError, IngestResult, IngestStats
+from structured_search.infra.loading import TolerantJSONLParser
+from structured_search.tasks.job_search.models import JobPosting
+
+
+def ingest_validate_jsonl(raw_text: str) -> IngestResult:
+    """Parse JSONL tolerantly then validate each record against JobPosting."""
+    parser = TolerantJSONLParser()
+    parsed_valid, parse_errors = parser.parse_with_lines(raw_text)
+
+    errors: list[IngestError] = [
+        IngestError(
+            line_no=e.line_no,
+            raw_preview=e.raw_preview,
+            kind=e.kind,  # type: ignore[arg-type]
+            message=e.message,
+        )
+        for e in parse_errors
+    ]
+
+    valid_records: list[dict[str, Any]] = []
+    schema_error_count = 0
+
+    for parsed in parsed_valid:
+        raw = parsed.record
+        try:
+            JobPosting.model_validate(raw)
+            valid_records.append(raw)
+        except ValidationError as exc:
+            schema_error_count += 1
+            errors.append(
+                IngestError(
+                    line_no=parsed.line_no,
+                    raw_preview=json.dumps(raw, ensure_ascii=False)[:200],
+                    kind="schema_validation",
+                    message=exc.errors(include_url=False).__str__(),
+                )
+            )
+
+    parse_ok_lines = sum(item.consumed_lines for item in parsed_valid)
+    parse_error_lines = sum(item.consumed_lines for item in parse_errors)
+    total_lines = parse_ok_lines + parse_error_lines
+
+    stats = IngestStats(
+        total_lines=total_lines,
+        parse_ok=parse_ok_lines,
+        schema_ok=len(valid_records),
+        parse_errors=parse_error_lines,
+        schema_errors=schema_error_count,
+    )
+    return IngestResult(valid=valid_records, invalid=errors, stats=stats)

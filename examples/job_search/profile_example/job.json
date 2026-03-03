@@ -1,0 +1,24 @@
+{
+    "id": "job_111",
+    "title": "Senior AI Backend Engineer",
+    "company": "DeepData AI",
+    "stack": [
+        "Python",
+        "FastAPI",
+        "PostgreSQL",
+        "LLMs"
+    ],
+    "seniority": "senior",
+    "modality": "remote",
+    "location": "Global",
+    "description": "We are looking for an experienced engineer to scale our AI inference layer. You will be responsible for deploying and optimizing local models and building reliable APIs for the frontend team.",
+    "url": "https://deepdata.example.com/careers/senior-ai-backend",
+    "extra": {
+        "source": "example",
+        "domain_tags": [
+            "AI",
+            "Backend"
+        ],
+        "salary_eur_gross": 95000
+    }
+}

@@ -1,0 +1,49 @@
+{
+  "version": "1.2.0",
+  "domain": "<task_name>",
+  "schema_file": "config/<task_name>/schema.json",
+  "result_entity": "record",
+  "key_fields": ["entity", "apply_url"],
+  "dedupe_fallback_key_fields": ["entity", "title", "location"],
+  "required_fields": ["entity", "title", "posted_at", "apply_url"],
+  "validation": {
+    "recency_field": "recency.activity_age_days",
+    "evidence_field": "evidence",
+    "facts_field": "facts",
+    "inferences_field": "inferences",
+    "notes_field": "notes",
+    "incomplete_field": "incomplete",
+    "required_evidence_fields": ["entity", "title", "posted_at", "apply_url"],
+    "enforce_evidence_reference_integrity": true,
+    "enforce_required_field_evidence_coverage": true
+  },
+  "evidence_model": {
+    "required_keys": ["id", "field", "quote", "url", "retrieved_at", "locator"],
+    "facts_must_have_evidence": true,
+    "inferences_must_reference_evidence": true
+  },
+  "security": {
+    "external_content_is_untrusted_data": true,
+    "injection_markers": [
+      "ignore previous instructions",
+      "system prompt",
+      "developer message",
+      "override policy"
+    ],
+    "anomaly_tag": "prompt_injection_suspected"
+  },
+  "scoring_pipeline": {
+    "features_artifact": "features.jsonl",
+    "engine": "scripts/score_<task_name>.py",
+    "scored_artifact": "scored_results.jsonl",
+    "metrics_artifact": "scoring_metrics.json",
+    "score_field": "score"
+  },
+  "constraint_fields": {
+    "field.path": {
+      "path": "field.path",
+      "type": "string|number|boolean|array[string]",
+      "allowed_ops": ["=", "in", "<=", ">=", "contains_any"]
+    }
+  }
+}
