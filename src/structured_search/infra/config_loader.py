@@ -27,13 +27,13 @@ from structured_search.infra.scoring_config import (
 # ---------------------------------------------------------------------------
 
 
-def _unwrap_to_model(ann: Any) -> type | None:
+def _unwrap_to_model(ann: Any) -> type[BaseModel] | None:
     """Extract the first Pydantic model class from a type annotation.
 
     Handles direct models, ``Model | None`` (Python 3.10+ union), and
     ``Optional[Model]`` (typing.Union).  Ignores list/set/dict generics.
     """
-    if isinstance(ann, type) and hasattr(ann, "model_fields"):
+    if isinstance(ann, type) and issubclass(ann, BaseModel):
         return ann
 
     origin = get_origin(ann)
@@ -43,7 +43,7 @@ def _unwrap_to_model(ann: Any) -> type | None:
         for arg in get_args(ann):
             if arg is type(None):
                 continue
-            if isinstance(arg, type) and hasattr(arg, "model_fields"):
+            if isinstance(arg, type) and issubclass(arg, BaseModel):
                 return arg
 
     # Python 3.10+ X | Y syntax — get_origin returns types.UnionType
@@ -51,14 +51,14 @@ def _unwrap_to_model(ann: Any) -> type | None:
         for arg in get_args(ann):
             if arg is type(None):
                 continue
-            if isinstance(arg, type) and hasattr(arg, "model_fields"):
+            if isinstance(arg, type) and issubclass(arg, BaseModel):
                 return arg
 
     return None
 
 
 def collect_model_field_paths(
-    model_cls: type, prefix: str = "", max_depth: int = 3
+    model_cls: type[BaseModel], prefix: str = "", max_depth: int = 3
 ) -> frozenset[str]:
     """Return all valid dotted field paths declared in a Pydantic v2 model.
 

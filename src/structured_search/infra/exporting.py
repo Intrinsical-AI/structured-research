@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from structured_search.domain import BaseResult
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 class JSONLExporter(ExportingPort):
     """Export records to a JSONL file (one JSON object per line)."""
 
-    def export(self, records: list[BaseResult], path: Path | str) -> None:
+    def export(self, records: Sequence[BaseResult], path: Path | str) -> None:
         file_path = Path(path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as f:
@@ -30,5 +31,5 @@ class MockExporter(ExportingPort):
     def __init__(self):
         self.records: list[BaseResult] = []
 
-    def export(self, records: list[BaseResult], path: Path | str) -> None:
-        self.records = records
+    def export(self, records: Sequence[BaseResult], path: Path | str) -> None:
+        self.records = list(records)

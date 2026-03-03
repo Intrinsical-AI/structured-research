@@ -1,6 +1,7 @@
 """ExportingPort: interface for exporting records to destinations."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
 
 from structured_search.domain import BaseResult
@@ -16,7 +17,7 @@ class ExportingPort(ABC):
     """
 
     @abstractmethod
-    def export(self, records: list[BaseResult], path: Path | str) -> None:
+    def export(self, records: Sequence[BaseResult], path: Path | str) -> None:
         """Export records to destination.
 
         Args:

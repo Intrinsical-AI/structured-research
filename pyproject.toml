@@ -55,3 +55,11 @@ python_files = ["unit_test_*.py", "integration_test_*.py", "api_test_*.py", "tes
 markers = [
     "integration: integration tests that require real config files (atoms, JSONL)",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["fastapi", "fastapi.*", "uvicorn", "langchain_ollama"]
+ignore_missing_imports = true

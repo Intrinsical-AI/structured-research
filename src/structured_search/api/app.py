@@ -34,12 +34,15 @@ from structured_search.contracts import (
     BundleWriteResponse,
     GenCVRequest,
     GenCVResponse,
+    JsonlInvalidRecord,
+    JsonlValidateMetrics,
     JsonlValidateRequest,
     JsonlValidateResponse,
     ProfileBundle,
     ProfileSummary,
     PromptGenerateRequest,
     PromptGenerateResponse,
+    RunResponseMetrics,
     RunScoreRequest,
     RunScoreResponse,
     RunValidateSummary,
@@ -198,24 +201,25 @@ def post_jsonl_validate(task_id: str, request: JsonlValidateRequest) -> dict[str
         raise HTTPException(status_code=422, detail=f"Task {task_id!r} has no record model")
 
     result = ingest_validate_jsonl(raw_text=request.raw_jsonl, record_model=plugin.record_model)
-    invalid_records = [
-        {
-            "line": err.line_no,
-            "error": err.message,
-            "raw": err.raw_preview,
-            "kind": err.kind,
-        }
+    invalid_records: list[JsonlInvalidRecord] = [
+        JsonlInvalidRecord(
+            line=err.line_no,
+            error=err.message,
+            raw=err.raw_preview,
+            kind=err.kind,
+        )
         for err in result.invalid
     ]
+    metrics = JsonlValidateMetrics(
+        total_lines=result.stats.total_lines,
+        json_valid_lines=result.stats.parse_ok,
+        schema_valid_records=result.stats.schema_ok,
+        invalid_lines=result.stats.parse_errors + result.stats.schema_errors,
+    )
     response = JsonlValidateResponse(
         valid_records=result.valid,
         invalid_records=invalid_records,
-        metrics={
-            "total_lines": result.stats.total_lines,
-            "json_valid_lines": result.stats.parse_ok,
-            "schema_valid_records": result.stats.schema_ok,
-            "invalid_lines": result.stats.parse_errors + result.stats.schema_errors,
-        },
+        metrics=metrics,
     )
 
     total_lines = response.metrics.total_lines
@@ -292,22 +296,21 @@ def post_task_run(
         require_snapshot=request.require_snapshot,
     )
 
+    run_metrics = RunResponseMetrics(
+        loaded=result.total,
+        processed=len(result.records),
+        skipped=result.skipped,
+        gate_passed=result.gate_passed,
+        gate_failed=result.gate_failed,
+        gate_pass_rate=((result.gate_passed / len(result.records)) if result.records else 0.0),
+        started_at=started_at.isoformat(),
+        finished_at=finished_at.isoformat(),
+    )
     response = RunScoreResponse(
         run_id=result.run_id,
         profile_id=result.profile_id,
         scored_records=result.records,
-        metrics={
-            "loaded": result.total,
-            "processed": len(result.records),
-            "skipped": result.skipped,
-            "gate_passed": result.gate_passed,
-            "gate_failed": result.gate_failed,
-            "gate_pass_rate": (
-                (result.gate_passed / len(result.records)) if result.records else 0.0
-            ),
-            "started_at": started_at.isoformat(),
-            "finished_at": finished_at.isoformat(),
-        },
+        metrics=run_metrics,
         errors=[e.model_dump(mode="json") for e in result.errors],
         snapshot_dir=result.snapshot_dir,
         snapshot_status=result.snapshot_status,

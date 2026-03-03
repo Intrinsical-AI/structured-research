@@ -79,6 +79,7 @@ def _candidate_input_to_profile(
 ) -> CandidateAtomsProfile:
     seniority = _coerce_seniority(candidate.seniority)
 
+    tech_stack: dict[str, list[str]]
     if candidate.tech_stack is None:
         tech_stack = {"languages": [], "frameworks": [], "platforms": [], "domains": []}
     else:

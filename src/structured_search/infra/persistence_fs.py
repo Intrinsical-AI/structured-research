@@ -151,9 +151,12 @@ class FilesystemProfileRepository(ProfileRepository):
             task_id = "job_search"
         if bundle is None:
             raise TypeError("save_bundle() missing required bundle argument")
+        if isinstance(profile_id, BundleData):
+            raise TypeError("save_bundle() profile_id must be a string")
+        resolved_profile_id = profile_id
         payload = {
             "task_id": task_id,
-            "profile_id": profile_id,
+            "profile_id": resolved_profile_id,
             "constraints": bundle.constraints,
             "task": bundle.task,
             "task_config": bundle.task_config,
@@ -161,7 +164,7 @@ class FilesystemProfileRepository(ProfileRepository):
             "domain_schema": bundle.domain_schema,
             "result_schema": bundle.result_schema,
         }
-        _write_json(self._bundle_path(task_id, profile_id), payload)
+        _write_json(self._bundle_path(task_id, resolved_profile_id), payload)
 
     def atoms_dir(self, task_id: str, profile_id: str | None = None) -> Path:
         # Compatibility mode: atoms_dir(profile_id)

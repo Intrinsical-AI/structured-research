@@ -86,7 +86,11 @@ def run_t01(base: str) -> None:
     # T01.1 GET /v1/tasks/job_search/profiles
     status, body = http("GET", f"{base}/v1/tasks/job_search/profiles")
     check("T01.1 GET /profiles → 200", status == 200, f"got {status}")
-    ids = [p.get("id") for p in body] if isinstance(body, list) else []
+    ids: list[str] = (
+        [p["id"] for p in body if isinstance(p, dict) and isinstance(p.get("id"), str)]
+        if isinstance(body, list)
+        else []
+    )
     check("T01.1 profile_example present", "profile_example" in ids, f"got {ids}")
 
     # T01.2 GET /v1/tasks/job_search/profiles/profile_example/bundle

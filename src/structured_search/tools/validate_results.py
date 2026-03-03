@@ -5,6 +5,9 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import TextIO
+
+from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,7 +55,7 @@ def validate_results(
 
     valid_count = 0
     invalid_count = 0
-    errors = []
+    errors: list[str] = []
 
     logger.info(f"Validating {task} results from {input_path}")
 
@@ -104,7 +107,7 @@ def validate_results(
     return 0
 
 
-def _select_model(task: str):
+def _select_model(task: str) -> type[BaseModel] | None:
     if task == "job_search":
         from structured_search.domain.job_search.models import JobPosting
 
@@ -121,7 +124,7 @@ def _select_model(task: str):
 
 
 def _write_invalid_record(
-    invalid_f,
+    invalid_f: TextIO,
     *,
     error_msg: str,
     raw_record: dict | None,
@@ -138,9 +141,9 @@ def _write_invalid_record(
 def _process_file_records(
     *,
     json_file: Path,
-    model,
-    valid_f,
-    invalid_f,
+    model: type[BaseModel],
+    valid_f: TextIO,
+    invalid_f: TextIO,
     errors: list[str],
     strict: bool,
 ) -> tuple[str, int, int]:
