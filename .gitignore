@@ -159,3 +159,9 @@ docs/TEST_SUITE_DESIGN.md
 .vscode
 .claude
 data/processed/**
+
+# Keep committed test fixtures under tests/fixtures/profiles
+!tests/fixtures/
+!tests/fixtures/profiles/
+!tests/fixtures/profiles/profile_1/
+!tests/fixtures/profiles/profile_1/bundle.json

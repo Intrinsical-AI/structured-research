@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from structured_search.application.common.dependencies import (
+    clear_configured_dependencies,
+    configure_filesystem_dependencies,
+)
 from structured_search.domain import BaseConstraints, BaseResult, ConstraintRule
 from structured_search.infra.exporting import MockExporter
 from structured_search.infra.loading import MockLoader
@@ -31,8 +36,29 @@ def repo_root() -> Path:
 
 @pytest.fixture(scope="session")
 def atoms_dir(repo_root: Path) -> Path:
-    """Path to the job_search atoms directory."""
-    return repo_root / "config" / "job_search" / "profile_1" / "atoms"
+    """Path to synthetic atoms directory used by integration tests when available."""
+    return repo_root / "tests" / "fixtures" / "profiles" / "profile_1" / "atoms"
+
+
+# ---------------------------------------------------------------------------
+# Default app dependencies for tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def configure_default_test_dependencies(repo_root: Path, tmp_path: Path):
+    """Point default app dependencies to committed test fixtures."""
+    fixture_profiles = repo_root / "tests" / "fixtures" / "profiles"
+    sandbox_profiles = tmp_path / "profiles"
+    shutil.copytree(fixture_profiles, sandbox_profiles, dirs_exist_ok=True)
+
+    configure_filesystem_dependencies(
+        profiles_base=sandbox_profiles,
+        runs_dir=tmp_path / "runs",
+        prompts_dir=repo_root / "resources" / "prompts",
+    )
+    yield
+    clear_configured_dependencies()
 
 
 # ---------------------------------------------------------------------------

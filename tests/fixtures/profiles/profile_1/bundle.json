@@ -1,0 +1,53 @@
+{
+  "profile_id": "profile_1",
+  "constraints": {
+    "domain": "job_search",
+    "must": [
+      {
+        "field": "modality",
+        "op": "in",
+        "value": [
+          "remote",
+          "hybrid"
+        ]
+      }
+    ],
+    "prefer": [],
+    "avoid": []
+  },
+  "task": {
+    "gates": {
+      "hard_filters_mode": "any",
+      "hard_filters": [],
+      "reject_anomalies": [],
+      "required_evidence_fields": []
+    },
+    "soft_scoring": {
+      "formula_version": "v2_soft_after_gates",
+      "prefer_weight_default": 1.0,
+      "avoid_penalty_default": 1.0,
+      "signal_boost": {},
+      "penalties": {}
+    }
+  },
+  "task_config": {
+    "agent_name": "TEST",
+    "runtime": {
+      "llm": {
+        "model": "lfm2.5-thinking"
+      }
+    }
+  },
+  "user_profile": {
+    "name": "Sample Candidate",
+    "seniority": "senior"
+  },
+  "domain_schema": {
+    "type": "object",
+    "title": "JobPosting"
+  },
+  "result_schema": {
+    "type": "object",
+    "title": "ScoredJobPosting"
+  }
+}
