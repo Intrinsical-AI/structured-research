@@ -13,15 +13,15 @@ from structured_search.application.common.dependencies import (
     configure_filesystem_dependencies,
 )
 from structured_search.domain import BaseConstraints, BaseResult, ConstraintRule
-from structured_search.infra.exporting import MockExporter
-from structured_search.infra.loading import MockLoader
-from structured_search.infra.scoring import MockScorer
-from structured_search.tasks.job_search.models import (
+from structured_search.domain.job_search.models import (
     GeoInfo,
     JobPosting,
     JobSearchConstraints,
     SeniorityInfo,
 )
+from structured_search.infra.exporting import MockExporter
+from structured_search.infra.loading import MockLoader
+from structured_search.infra.scoring import MockScorer
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -37,7 +37,7 @@ def repo_root() -> Path:
 @pytest.fixture(scope="session")
 def atoms_dir(repo_root: Path) -> Path:
     """Path to synthetic atoms directory used by integration tests when available."""
-    return repo_root / "tests" / "fixtures" / "profiles" / "profile_1" / "atoms"
+    return repo_root / "tests" / "fixtures" / "profiles" / "profile_example" / "atoms"
 
 
 # ---------------------------------------------------------------------------

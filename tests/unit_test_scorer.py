@@ -180,6 +180,18 @@ class TestNeutralIfNa:
         rule = _rule("salary", ">=", 80000, neutral_if_na=False)
         assert scorer._check_rule(record, rule) is False
 
+    def test_null_field_neutral_if_na_true_returns_none(self):
+        scorer = _scorer()
+        record = _make_record(salary=None)
+        rule = _rule("salary", ">=", 80000, neutral_if_na=True)
+        assert scorer._check_rule(record, rule) is None
+
+    def test_null_field_neutral_if_na_false_returns_false(self):
+        scorer = _scorer()
+        record = _make_record(salary=None)
+        rule = _rule("salary", ">=", 80000, neutral_if_na=False)
+        assert scorer._check_rule(record, rule) is False
+
     def test_prefer_neutral_field_adds_no_boost(self):
         """neutral_if_na=True on a prefer rule must NOT add boost when field is absent."""
         prefer_rule = _rule("salary", ">=", 80000, weight=3.0, neutral_if_na=True)
@@ -221,6 +233,14 @@ class TestNeutralIfNa:
         scored = _scorer().score(record, constraints)
         assert scored.gate_passed is False
         assert len(scored.gate_failures) == 1
+
+    def test_must_null_field_with_neutral_if_na_true_passes_gate(self):
+        must_rule = _rule("visa_sponsorship_offered", "=", True, neutral_if_na=True)
+        constraints = _make_constraints(must=[must_rule])
+        record = _make_record(visa_sponsorship_offered=None)
+        scored = _scorer().score(record, constraints)
+        assert scored.gate_passed is True
+        assert scored.gate_failures == []
 
 
 # ============================================================================
@@ -302,6 +322,36 @@ class TestHeuristicScorerGates:
         scored = scorer.score(record, _make_constraints())
         assert scored.gate_passed is False
         assert "missing_evidence: title" in scored.gate_failures
+
+    def test_required_evidence_parent_matches_evidence_child(self):
+        gates = GatesConfig(required_evidence_fields=["apply_url"])
+        scorer = _scorer(gates=gates)
+        anchor = EvidenceAnchor(
+            id="e1",
+            field="apply_url.href",
+            quote="Apply here",
+            url="https://example.com",
+            retrieved_at=datetime.now(),
+            locator=EvidenceLocator(type="css_selector", value=".apply"),
+        )
+        record = BaseResult(id="r1", source="test", evidence=[anchor])
+        scored = scorer.score(record, _make_constraints())
+        assert scored.gate_passed is True
+
+    def test_required_evidence_child_matches_evidence_parent(self):
+        gates = GatesConfig(required_evidence_fields=["apply_url.href"])
+        scorer = _scorer(gates=gates)
+        anchor = EvidenceAnchor(
+            id="e1",
+            field="apply_url",
+            quote="Apply here",
+            url="https://example.com",
+            retrieved_at=datetime.now(),
+            locator=EvidenceLocator(type="css_selector", value=".apply"),
+        )
+        record = BaseResult(id="r1", source="test", evidence=[anchor])
+        scored = scorer.score(record, _make_constraints())
+        assert scored.gate_passed is True
 
     def test_hard_filter_any_mode_each_failure_reported(self):
         """mode='require_all': each failing hard filter is its own gate failure (AND)."""

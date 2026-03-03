@@ -5,15 +5,16 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from structured_search.api.app import post_gen_cv, post_run
+from structured_search.api.app import post_action_gen_cv, post_task_run
 from structured_search.contracts import GenCVRequest, RunScoreRequest, RunSummary
 
 
 def test_post_gen_cv_missing_seniority_returns_422():
     with pytest.raises(HTTPException) as exc:
-        post_gen_cv(
+        post_action_gen_cv(
+            "gen_cv",
             GenCVRequest(
-                profile_id="profile_1",
+                profile_id="profile_example",
                 job={
                     "id": "job-001",
                     "title": "Senior Backend Engineer",
@@ -21,7 +22,7 @@ def test_post_gen_cv_missing_seniority_returns_422():
                     "stack": ["Python", "FastAPI"],
                 },
                 candidate_profile={"name": "Jane Doe", "seniority": ""},
-            )
+            ),
         )
 
     assert exc.value.status_code == 422
@@ -31,10 +32,12 @@ def test_post_gen_cv_missing_seniority_returns_422():
 def test_post_run_happy_path_via_http_contract(monkeypatch: pytest.MonkeyPatch):
     import structured_search.api.app as app_module
 
-    def _fake_run_score(_request: RunScoreRequest) -> RunSummary:
+    def _fake_run_score(*, task_id: str, request: RunScoreRequest, plugin) -> RunSummary:
+        assert task_id == "job_search"
+        _ = request, plugin
         return RunSummary(
-            run_id="profile_1-20260222-050500-a1b2c3",
-            profile_id="profile_1",
+            run_id="profile_example-20260222-050500-a1b2c3",
+            profile_id="profile_example",
             total=1,
             gate_passed=1,
             gate_failed=0,
@@ -49,37 +52,43 @@ def test_post_run_happy_path_via_http_contract(monkeypatch: pytest.MonkeyPatch):
                 }
             ],
             errors=[],
-            snapshot_dir="runs/profile_1-20260222-050500-a1b2c3",
+            snapshot_dir="runs/profile_example-20260222-050500-a1b2c3",
             snapshot_status="written",
             snapshot_error=None,
         )
 
     monkeypatch.setattr(app_module, "run_score", _fake_run_score)
-    body = post_run(
+    body = post_task_run(
+        "job_search",
         RunScoreRequest(
-            profile_id="profile_1",
+            profile_id="profile_example",
             records=[{"id": "1"}],
-        )
+        ),
     )
-    assert body["run_id"] == "profile_1-20260222-050500-a1b2c3"
+    assert body["run_id"] == "profile_example-20260222-050500-a1b2c3"
     assert body["metrics"]["processed"] == 1
+    assert body["metrics"]["gate_passed"] == 1
+    assert body["metrics"]["gate_failed"] == 0
+    assert body["metrics"]["gate_pass_rate"] == 1.0
     assert body["snapshot_status"] == "written"
 
 
 def test_post_run_runtime_error_maps_to_500(monkeypatch: pytest.MonkeyPatch):
     import structured_search.api.app as app_module
 
-    def _boom(_request: RunScoreRequest) -> RunSummary:
+    def _boom(*, task_id: str, request: RunScoreRequest, plugin) -> RunSummary:
+        _ = task_id, request, plugin
         raise RuntimeError("snapshot write failed")
 
     monkeypatch.setattr(app_module, "run_score", _boom)
     with pytest.raises(HTTPException) as exc:
-        post_run(
+        post_task_run(
+            "job_search",
             RunScoreRequest(
-                profile_id="profile_1",
+                profile_id="profile_example",
                 records=[{"id": "1"}],
                 require_snapshot=True,
-            )
+            ),
         )
 
     assert exc.value.status_code == 500

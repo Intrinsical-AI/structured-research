@@ -1,0 +1,55 @@
+{
+  "task_id": "product_search",
+  "profile_id": "profile_default",
+  "constraints": {
+    "domain": "product_search",
+    "must": [],
+    "prefer": [],
+    "avoid": []
+  },
+  "task": {
+    "gates": {
+      "hard_filters_mode": "require_all",
+      "hard_filters": [],
+      "reject_anomalies": [],
+      "required_evidence_fields": []
+    },
+    "soft_scoring": {
+      "formula_version": "v2_soft_after_gates",
+      "prefer_weight_default": 1.0,
+      "avoid_penalty_default": 1.0,
+      "signal_boost": {
+        "evidence_present": 0.5,
+        "salary_disclosed": 0.0,
+        "salary_field": "pricing.amount"
+      },
+      "penalties": {
+        "incomplete": 1.0,
+        "missing_salary": 0.5,
+        "old_posting": 0.0,
+        "old_posting_field": "published_at",
+        "old_posting_threshold_days": 30,
+        "inference_used": 0.2,
+        "prompt_injection_suspected": 2.0,
+        "excess_hybrid_days": 0.0,
+        "excess_hybrid_days_field": "_unused",
+        "excess_hybrid_days_threshold": 0
+      }
+    }
+  },
+  "task_config": {
+    "agent_name": "PRODUCT_SEARCH",
+    "version": "1.0.0",
+    "language_priority": ["en"],
+    "max_results": 50
+  },
+  "user_profile": {
+    "timezone": "UTC",
+    "mobility": "online",
+    "risk_tolerance": "medium",
+    "currency_default": "EUR",
+    "language_preference": ["en"]
+  },
+  "domain_schema": null,
+  "result_schema": null
+}

@@ -18,12 +18,12 @@ from structured_search.ports.persistence import BundleData
 def _deps(tmp_path: Path) -> ApplicationDependencies:
     profile_repo = FilesystemProfileRepository(base_dir=tmp_path / "profiles")
     profile_repo.save_bundle(
-        "profile_1",
+        "profile_example",
         BundleData(
             constraints={"domain": "job_search", "must": [], "prefer": [], "avoid": []},
             task={
                 "gates": {
-                    "hard_filters_mode": "any",
+                    "hard_filters_mode": "require_all",
                     "hard_filters": [],
                     "reject_anomalies": [],
                     "required_evidence_fields": [],
@@ -62,7 +62,7 @@ def test_gen_cv_uses_fallback_when_ollama_is_unavailable(tmp_path: Path):
             raise RuntimeError("ollama unavailable")
 
     result = gen_cv(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
         deps=_deps(tmp_path),
@@ -77,7 +77,7 @@ def test_gen_cv_uses_fallback_when_ollama_is_unavailable(tmp_path: Path):
 def test_gen_cv_rejects_missing_seniority(tmp_path: Path):
     with pytest.raises(ValueError):
         gen_cv(
-            profile_id="profile_1",
+            profile_id="profile_example",
             job=_job(),
             candidate_profile={"id": "cand-1"},
             deps=_deps(tmp_path),
@@ -91,7 +91,7 @@ def test_gen_cv_raises_when_mock_fallback_disabled(tmp_path: Path):
 
     with pytest.raises(RuntimeError):
         gen_cv(
-            profile_id="profile_1",
+            profile_id="profile_example",
             job=_job(),
             candidate_profile={"id": "cand-1", "seniority": "senior"},
             allow_mock_fallback=False,

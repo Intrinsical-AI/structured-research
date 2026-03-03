@@ -13,7 +13,6 @@ def test_api_app_does_not_import_forbidden_layers():
         "structured_search.domain",
         "structured_search.ports",
         "structured_search.infra",
-        "structured_search.tasks",
     )
 
     bad_imports: list[str] = []

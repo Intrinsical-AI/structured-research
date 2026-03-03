@@ -1,6 +1,6 @@
 """Integration tests for AtomsGrounding with real atoms files.
 
-These tests load actual YAML files from config/job_search/profile_1/atoms/ and verify
+These tests load actual YAML files from config/job_search/profile_example/atoms/ and verify
 that the grounding adapter resolves contexts, claims, and evidence correctly.
 They require the repository's config directory to be present.
 """

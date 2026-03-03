@@ -23,9 +23,9 @@ def _bundle_data() -> BundleData:
 
 def test_profile_repository_save_and_load_roundtrip(tmp_path):
     repo = FilesystemProfileRepository(base_dir=tmp_path)
-    repo.save_bundle("profile_test", _bundle_data())
+    repo.save_bundle("job_search", "profile_test", _bundle_data())
 
-    loaded = repo.load_bundle("profile_test")
+    loaded = repo.load_bundle("job_search", "profile_test")
     assert loaded.constraints["domain"] == "job_search"
     assert loaded.task_config["agent_name"] == "TEST"
     assert loaded.user_profile == {"name": "Jane"}
@@ -34,12 +34,13 @@ def test_profile_repository_save_and_load_roundtrip(tmp_path):
 def test_profile_repository_persists_optional_fields_as_none(tmp_path):
     repo = FilesystemProfileRepository(base_dir=tmp_path)
     bundle = _bundle_data()
-    repo.save_bundle("profile_test", bundle)
+    repo.save_bundle("job_search", "profile_test", bundle)
 
-    bundle_path = tmp_path / "profile_test" / "bundle.json"
+    bundle_path = tmp_path / "job_search" / "profile_test" / "bundle.json"
     assert json.loads(bundle_path.read_text())["user_profile"] == {"name": "Jane"}
 
     repo.save_bundle(
+        "job_search",
         "profile_test",
         BundleData(
             constraints=bundle.constraints,
@@ -55,8 +56,8 @@ def test_profile_repository_persists_optional_fields_as_none(tmp_path):
 
 def test_profile_repository_list_profiles_discovers_saved_profile(tmp_path):
     repo = FilesystemProfileRepository(base_dir=tmp_path)
-    repo.save_bundle("profile_test", _bundle_data())
-    profiles = repo.list_profiles()
+    repo.save_bundle("job_search", "profile_test", _bundle_data())
+    profiles = repo.list_profiles("job_search")
     assert len(profiles) == 1
     assert profiles[0].id == "profile_test"
     assert profiles[0].updated_at

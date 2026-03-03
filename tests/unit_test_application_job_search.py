@@ -1,24 +1,28 @@
-"""Unit tests for application.job_search use-cases."""
+"""Unit tests for task-scoped application/core use-cases."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from structured_search.application.common.dependencies import ApplicationDependencies
-from structured_search.application.job_search.ingest import ingest_validate_jsonl
-from structured_search.application.job_search.profiles import (
+from structured_search.application.core.bundle_service import (
     list_profiles,
     load_bundle,
     save_bundle,
 )
-from structured_search.application.job_search.prompts import generate_prompt
-from structured_search.application.job_search.run_scoring import run_score, validate_run
+from structured_search.application.core.ingest_service import ingest_validate_jsonl
+from structured_search.application.core.prompt_service import generate_prompt
+from structured_search.application.core.run_service import run_score, validate_run
+from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle, RunScoreRequest
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
 )
 from structured_search.ports.persistence import BundleData, RunRepository, SnapshotWriteResult
+
+_TASK_ID = "job_search"
+_PLUGIN = get_task_registry().get(_TASK_ID)
 
 
 def _minimal_constraints() -> dict:
@@ -33,7 +37,7 @@ def _minimal_constraints() -> dict:
 def _minimal_task() -> dict:
     return {
         "gates": {
-            "hard_filters_mode": "any",
+            "hard_filters_mode": "require_all",
             "hard_filters": [],
             "reject_anomalies": [],
             "required_evidence_fields": [],
@@ -50,6 +54,7 @@ def _minimal_task() -> dict:
 
 def _minimal_bundle(profile_id: str = "app-profile") -> ProfileBundle:
     return ProfileBundle(
+        task_id=_TASK_ID,
         profile_id=profile_id,
         constraints=_minimal_constraints(),
         task=_minimal_task(),
@@ -115,22 +120,41 @@ class _FailingRunRepository(RunRepository):
 def test_profiles_bundle_roundtrip_and_listing(tmp_path: Path):
     deps = _deps(tmp_path)
     bundle = _minimal_bundle()
-    result = save_bundle(bundle, deps=deps)
+    result = save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
     assert result.valid is True
 
-    loaded = load_bundle("app-profile", deps=deps)
+    loaded = load_bundle(task_id=_TASK_ID, profile_id="app-profile", deps=deps)
     assert loaded.profile_id == "app-profile"
     assert loaded.constraints["domain"] == "job_search"
 
-    discovered = list_profiles(deps=deps)
+    discovered = list_profiles(task_id=_TASK_ID, deps=deps)
     assert any(item["id"] == "app-profile" for item in discovered)
 
 
 def test_generate_prompt_includes_constraints_and_profile(tmp_path: Path):
     deps = _deps(tmp_path)
-    save_bundle(_minimal_bundle(), deps=deps)
+    bundle = _minimal_bundle()
+    save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
 
-    prompt = generate_prompt("app-profile", "S3_execute", deps=deps)
+    prompt = generate_prompt(
+        task_id=_TASK_ID,
+        profile_id="app-profile",
+        step="S3_execute",
+        plugin=_PLUGIN,
+        deps=deps,
+    )
     assert "## Search Constraints" in prompt.prompt
     assert "## Candidate Profile" in prompt.prompt
 
@@ -143,39 +167,61 @@ def test_ingest_validate_jsonl_reports_parse_errors():
         '"modality":"remote","seniority":{"level":"senior"},"stack":["Python"],'
         '"evidence":[],"facts":[],"inferences":[],"anomalies":[],"incomplete":false}'
     )
-    result = ingest_validate_jsonl(valid_line + "\nNOT_JSON")
+    assert _PLUGIN.record_model is not None
+    result = ingest_validate_jsonl(
+        raw_text=valid_line + "\nNOT_JSON",
+        record_model=_PLUGIN.record_model,
+    )
     assert result.stats.parse_errors == 1
     assert result.stats.schema_ok == 1
 
 
 def test_run_score_writes_snapshot(tmp_path: Path):
     deps = _deps(tmp_path)
-    save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
-
-    result = run_score(
-        RunScoreRequest(
-            profile_id="profile_1",
-            records=[_minimal_posting_dict(1), _minimal_posting_dict(2)],
-            require_snapshot=True,
-        ),
+    bundle = _minimal_bundle(profile_id="profile_example")
+    save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
         deps=deps,
     )
 
-    assert result.run_id.startswith("profile_1-")
+    result = run_score(
+        task_id=_TASK_ID,
+        request=RunScoreRequest(
+            profile_id="profile_example",
+            records=[_minimal_posting_dict(1), _minimal_posting_dict(2)],
+            require_snapshot=True,
+        ),
+        plugin=_PLUGIN,
+        deps=deps,
+    )
+
+    assert result.run_id.startswith("job_search-profile_example-")
     assert result.snapshot_status == "written"
     assert result.snapshot_dir is not None
 
 
 def test_validate_run_checks_snapshot_io_without_leaving_probe_files(tmp_path: Path):
     deps = _deps(tmp_path)
-    save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
+    bundle = _minimal_bundle(profile_id="profile_example")
+    save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
 
     result = validate_run(
-        RunScoreRequest(
-            profile_id="profile_1",
+        task_id=_TASK_ID,
+        request=RunScoreRequest(
+            profile_id="profile_example",
             records=[_minimal_posting_dict(1)],
             require_snapshot=True,
         ),
+        plugin=_PLUGIN,
         deps=deps,
     )
 
@@ -192,14 +238,23 @@ def test_validate_run_reports_not_runnable_when_required_snapshot_io_fails(tmp_p
         run_repo=_FailingRunRepository(),
         prompts_dir=Path("resources/prompts"),
     )
-    save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
+    bundle = _minimal_bundle(profile_id="profile_example")
+    save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
 
     result = validate_run(
-        RunScoreRequest(
-            profile_id="profile_1",
+        task_id=_TASK_ID,
+        request=RunScoreRequest(
+            profile_id="profile_example",
             records=[_minimal_posting_dict(1)],
             require_snapshot=True,
         ),
+        plugin=_PLUGIN,
         deps=deps,
     )
 

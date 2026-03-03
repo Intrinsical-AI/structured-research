@@ -8,8 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from structured_search.application.job_search.ingest import ingest_validate_jsonl
+from structured_search.application.core.ingest_service import ingest_validate_jsonl
+from structured_search.application.core.task_registry import get_task_registry
 from structured_search.infra.loading import TolerantJSONLParser
+
+_PLUGIN = get_task_registry().get("job_search")
 
 _MINIMAL_POSTING = {
     "id": "test-001",
@@ -77,23 +80,64 @@ class TestTolerantJSONLParser:
         assert valid == [{"a": 1, "b": "hello"}]
         assert errors == []
 
+    def test_bare_open_brace_does_not_swallow_following_records(self):
+        parser = self._parser()
+        text = textwrap.dedent(
+            """\
+            {"a": 1}
+            {
+            {"b": 2}
+            {"c": 3}
+            """
+        )
+        valid, errors = parser.parse(text)
+        assert valid == [{"a": 1}, {"b": 2}, {"c": 3}]
+        assert len(errors) == 1
+        assert errors[0].kind == "json_parse"
+        assert errors[0].line_no == 2
+
 
 class TestIngestValidateJsonl:
     def test_clean_valid_record(self):
-        result = ingest_validate_jsonl(json.dumps(_MINIMAL_POSTING))
+        assert _PLUGIN.record_model is not None
+        result = ingest_validate_jsonl(
+            raw_text=json.dumps(_MINIMAL_POSTING),
+            record_model=_PLUGIN.record_model,
+        )
         assert result.stats.schema_ok == 1
         assert result.stats.schema_errors == 0
 
     def test_valid_and_schema_invalid_mix(self):
         bad = {"id": "bad-001", "source": "x"}
-        result = ingest_validate_jsonl(_jsonl(_MINIMAL_POSTING, bad))
+        assert _PLUGIN.record_model is not None
+        result = ingest_validate_jsonl(
+            raw_text=_jsonl(_MINIMAL_POSTING, bad),
+            record_model=_PLUGIN.record_model,
+        )
         assert result.stats.schema_ok == 1
         assert result.stats.schema_errors == 1
 
     def test_broken_json_line_counted(self):
-        result = ingest_validate_jsonl(f"{json.dumps(_MINIMAL_POSTING)}\nNOT_JSON")
+        assert _PLUGIN.record_model is not None
+        result = ingest_validate_jsonl(
+            raw_text=f"{json.dumps(_MINIMAL_POSTING)}\nNOT_JSON",
+            record_model=_PLUGIN.record_model,
+        )
         assert result.stats.parse_errors == 1
         assert result.stats.schema_ok == 1
+
+    def test_inference_string_returns_actionable_schema_message(self):
+        bad = dict(_MINIMAL_POSTING)
+        bad["inferences"] = ["salary_inferred"]
+        assert _PLUGIN.record_model is not None
+        result = ingest_validate_jsonl(
+            raw_text=json.dumps(bad),
+            record_model=_PLUGIN.record_model,
+        )
+        assert result.stats.schema_errors == 1
+        assert any(
+            "inferences[0] must be an object with keys" in err.message for err in result.invalid
+        )
 
 
 _RESULTS_DIR = Path(__file__).parent.parent / "results" / "job_search"
@@ -111,7 +155,8 @@ def _find_result_files() -> list[Path]:
 )
 def test_real_results_jsonl(results_file: Path):
     raw_text = results_file.read_text(encoding="utf-8")
-    result = ingest_validate_jsonl(raw_text)
+    assert _PLUGIN.record_model is not None
+    result = ingest_validate_jsonl(raw_text=raw_text, record_model=_PLUGIN.record_model)
 
     total = result.stats.total_lines
     if total == 0:

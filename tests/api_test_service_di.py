@@ -9,16 +9,20 @@ from structured_search.application.common.dependencies import (
     clear_configured_dependencies,
     configure_dependencies,
 )
-from structured_search.application.job_search.profiles import (
+from structured_search.application.core.bundle_service import (
     list_profiles,
     load_bundle,
     save_bundle,
 )
+from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
 )
+
+_TASK_ID = "job_search"
+_PLUGIN = get_task_registry().get(_TASK_ID)
 
 
 def _minimal_constraints() -> dict:
@@ -33,7 +37,7 @@ def _minimal_constraints() -> dict:
 def _minimal_task() -> dict:
     return {
         "gates": {
-            "hard_filters_mode": "any",
+            "hard_filters_mode": "require_all",
             "hard_filters": [],
             "reject_anomalies": [],
             "required_evidence_fields": [],
@@ -50,6 +54,7 @@ def _minimal_task() -> dict:
 
 def _minimal_bundle(profile_id: str = "di-profile") -> ProfileBundle:
     return ProfileBundle(
+        task_id=_TASK_ID,
         profile_id=profile_id,
         constraints=_minimal_constraints(),
         task=_minimal_task(),
@@ -65,13 +70,20 @@ def test_service_functions_accept_explicit_dependencies(tmp_path):
         prompts_dir=Path("resources/prompts"),
     )
 
-    result = save_bundle(_minimal_bundle(), deps=deps)
+    bundle = _minimal_bundle()
+    result = save_bundle(
+        task_id=_TASK_ID,
+        profile_id=bundle.profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
     assert result.valid is True
 
-    loaded = load_bundle("di-profile", deps=deps)
+    loaded = load_bundle(task_id=_TASK_ID, profile_id="di-profile", deps=deps)
     assert loaded.profile_id == "di-profile"
 
-    profiles = list_profiles(deps=deps)
+    profiles = list_profiles(task_id=_TASK_ID, deps=deps)
     assert any(item["id"] == "di-profile" for item in profiles)
 
 
@@ -83,10 +95,16 @@ def test_configure_dependencies_enables_injected_runtime_wiring(tmp_path):
         prompts_dir=Path("resources/prompts"),
     )
     try:
-        result = save_bundle(_minimal_bundle(profile_id="startup-profile"))
+        bundle = _minimal_bundle(profile_id="startup-profile")
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+        )
         assert result.valid is True
 
-        loaded = load_bundle("startup-profile")
+        loaded = load_bundle(task_id=_TASK_ID, profile_id="startup-profile")
         assert loaded.profile_id == "startup-profile"
     finally:
         clear_configured_dependencies()

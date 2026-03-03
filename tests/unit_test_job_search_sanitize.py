@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from structured_search.tasks.job_search.models import JobPosting
-from structured_search.tasks.job_search.sanitize import sanitize_jsonl_for_run
+from structured_search.application.core.plugins.job_search_sanitize import sanitize_jsonl_for_run
+from structured_search.domain.job_search.models import JobPosting
 
 
 def _minimal_posting() -> dict:

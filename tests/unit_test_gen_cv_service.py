@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from structured_search.application.gen_cv.service import GenCVService
 from structured_search.domain.atoms import ClaimAtom, ContextAtom, EvidenceAtom
+from structured_search.domain.gen_cv.models import CandidateAtomsProfile, JobDescription
 from structured_search.infra.llm import MockLLM
 from structured_search.ports.grounding import GroundingPort
-from structured_search.tasks.gen_cv.models import CandidateAtomsProfile, JobDescription
-from structured_search.tasks.gen_cv.service import GenCVService
 
 
 class _FakeGrounding(GroundingPort):

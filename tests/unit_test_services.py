@@ -4,11 +4,11 @@ from datetime import datetime
 
 import pytest
 
+from structured_search.application.core.plugins.job_search_etl import ETLJobSearch
+from structured_search.domain.job_search.models import JobSearchConstraints
 from structured_search.infra.exporting import MockExporter
 from structured_search.infra.loading import MockLoader
 from structured_search.infra.scoring import MockScorer
-from structured_search.tasks.job_search.models import JobSearchConstraints
-from structured_search.tasks.job_search.service import ETLJobSearch
 
 
 def _valid_job_record(**overrides):

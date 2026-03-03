@@ -1,17 +1,9 @@
 {
+  "task_id": "job_search",
   "profile_id": "profile_example",
   "constraints": {
     "domain": "job_search",
-    "must": [
-      {
-        "field": "modality",
-        "op": "in",
-        "value": [
-          "remote",
-          "hybrid"
-        ]
-      }
-    ],
+    "must": [],
     "prefer": [],
     "avoid": []
   },
@@ -31,23 +23,17 @@
     }
   },
   "task_config": {
-    "agent_name": "TEST",
-    "runtime": {
-      "llm": {
-        "model": "lfm2.5-thinking"
-      }
-    }
+    "agent_name": "USAT",
+    "version": "1.0.0",
+    "language_priority": ["en"]
   },
   "user_profile": {
-    "name": "Sample Candidate",
-    "seniority": "senior"
+    "timezone": "UTC",
+    "mobility": "remote",
+    "risk_tolerance": "medium",
+    "currency_default": "EUR",
+    "language_preference": ["en"]
   },
-  "domain_schema": {
-    "type": "object",
-    "title": "JobPosting"
-  },
-  "result_schema": {
-    "type": "object",
-    "title": "ScoredJobPosting"
-  }
+  "domain_schema": null,
+  "result_schema": null
 }

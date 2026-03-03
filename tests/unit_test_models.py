@@ -14,14 +14,14 @@ from structured_search.domain import (
     ScoredResult,
 )
 from structured_search.domain.atoms import ClaimAtom, ContextAtom, EvidenceAtom
-from structured_search.tasks.gen_cv.models import (
+from structured_search.domain.gen_cv.models import (
     CandidateAtomsProfile,
     ExperienceEntry,
     GeneratedCV,
     JobDescription,
     SkillSet,
 )
-from structured_search.tasks.job_search.models import JobPosting
+from structured_search.domain.job_search.models import JobPosting
 
 
 class TestBaseResult:
@@ -94,7 +94,7 @@ class TestAtoms:
 
 class TestJobPosting:
     def test_create_job_posting(self):
-        from structured_search.tasks.job_search.models import GeoInfo, SeniorityInfo
+        from structured_search.domain.job_search.models import GeoInfo, SeniorityInfo
 
         posting = JobPosting(
             id="job_001",

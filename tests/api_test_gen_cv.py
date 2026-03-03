@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from fastapi import HTTPException
 
-from structured_search.api.app import post_gen_cv
+from structured_search.api.app import post_action_gen_cv
 from structured_search.contracts import GenCVRequest
-from structured_search.tasks.gen_cv.models import GeneratedCV
+from structured_search.domain.gen_cv.models import GeneratedCV
 
 
 def _minimal_job() -> dict:
@@ -21,7 +23,7 @@ def _minimal_job() -> dict:
 
 def test_gen_cv_accepts_scored_job_shape_seniority_object():
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job={
             **_minimal_job(),
             "seniority": {"level": "junior"},
@@ -33,7 +35,7 @@ def test_gen_cv_accepts_scored_job_shape_seniority_object():
             "spoken_languages": ["es", "en"],
         },
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert "cv_markdown" in body
     assert isinstance(body.get("generated_cv_json"), dict)
@@ -41,7 +43,7 @@ def test_gen_cv_accepts_scored_job_shape_seniority_object():
 
 def test_gen_cv_autogenerates_candidate_id_when_missing():
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         # canonical profile shape: seniority as string, no id (auto-generated)
         candidate_profile={
@@ -50,21 +52,21 @@ def test_gen_cv_autogenerates_candidate_id_when_missing():
             "spoken_languages": ["es", "en"],
         },
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert "cv_markdown" in body
     assert isinstance(body.get("generated_cv_json"), dict)
-    assert body["generated_cv_json"]["candidate_id"] == "profile_1_candidate"
+    assert body["generated_cv_json"]["candidate_id"] == "profile_example_candidate"
 
 
 def test_gen_cv_invalid_candidate_returns_422():
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"name": "Jane Doe", "seniority": ""},
     )
     with pytest.raises(HTTPException) as exc:
-        post_gen_cv(request)
+        post_action_gen_cv("gen_cv", request)
     assert exc.value.status_code == 422
     assert "seniority" in str(exc.value.detail).lower()
 
@@ -76,7 +78,7 @@ def test_gen_cv_profile_not_found_returns_404():
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
     with pytest.raises(HTTPException) as exc:
-        post_gen_cv(request)
+        post_action_gen_cv("gen_cv", request)
     assert exc.value.status_code == 404
 
 
@@ -86,14 +88,21 @@ def test_gen_cv_runtime_error_returns_503(monkeypatch):
     def _boom(**_kwargs):
         raise RuntimeError("llm unavailable")
 
-    monkeypatch.setattr(app_module, "gen_cv", _boom)
+    class _FakePlugin:
+        action_handlers: ClassVar[dict[str, object]] = {"gen-cv": _boom}
+
+        @staticmethod
+        def supports(capability: str) -> bool:
+            return capability == "action:gen-cv"
+
+    monkeypatch.setattr(app_module, "_require_capability", lambda *_args, **_kwargs: _FakePlugin())
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
     with pytest.raises(HTTPException) as exc:
-        post_gen_cv(request)
+        post_action_gen_cv("gen_cv", request)
     assert exc.value.status_code == 503
     assert "llm unavailable" in str(exc.value.detail)
 
@@ -106,13 +115,13 @@ def test_gen_cv_can_disable_mock_fallback(monkeypatch):
 
     monkeypatch.setattr(gen_cv_app, "OllamaLLM", _boom)
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
         allow_mock_fallback=False,
     )
     with pytest.raises(HTTPException) as exc:
-        post_gen_cv(request)
+        post_action_gen_cv("gen_cv", request)
     assert exc.value.status_code == 503
     assert "mock fallback disabled" in str(exc.value.detail).lower()
 
@@ -141,11 +150,11 @@ def test_gen_cv_falls_back_when_ollama_generation_fails(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert body["model_info"]["fallback_used"] is True
     assert body["generated_cv_json"]["source"] == "mock-llm"
@@ -184,11 +193,11 @@ def test_gen_cv_falls_back_when_ollama_returns_empty_content(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert body["model_info"]["fallback_used"] is True
     assert body["generated_cv_json"]["summary"] == "fallback summary"
@@ -227,11 +236,11 @@ def test_gen_cv_falls_back_when_ollama_returns_placeholder_content(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert body["model_info"]["fallback_used"] is True
     assert body["generated_cv_json"]["summary"] == "fallback summary"
@@ -256,12 +265,12 @@ def test_gen_cv_passes_selected_claim_ids_to_service_generate(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
         selected_claim_ids=["CLM-1", "CLM-2"],
     )
-    res = post_gen_cv(request)
+    res = post_action_gen_cv("gen_cv", request)
     body = res.model_dump(mode="json")
     assert captured["allowed_claim_ids"] == ["CLM-1", "CLM-2"]
     assert body["generated_cv_json"]["grounded_claim_ids"] == ["CLM-1", "CLM-2"]
@@ -292,12 +301,12 @@ def test_gen_cv_passes_llm_model_to_ollama(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
         llm_model="mistral",
     )
-    post_gen_cv(request)
+    post_action_gen_cv("gen_cv", request)
     assert captured["llm_model"] == "mistral"
 
 
@@ -326,7 +335,7 @@ def test_gen_cv_preserves_availability_days_zero(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={
             "id": "cand-1",
@@ -334,7 +343,7 @@ def test_gen_cv_preserves_availability_days_zero(monkeypatch):
             "availability_days": 0,
         },
     )
-    post_gen_cv(request)
+    post_action_gen_cv("gen_cv", request)
     assert captured["availability_days"] == 0
 
 
@@ -366,10 +375,10 @@ def test_gen_cv_uses_env_model_and_base_url_when_not_provided(monkeypatch):
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
-        profile_id="profile_1",
+        profile_id="profile_example",
         job=_minimal_job(),
         candidate_profile={"id": "cand-1", "seniority": "senior"},
     )
-    post_gen_cv(request)
+    post_action_gen_cv("gen_cv", request)
     assert captured["llm_model"] == "qwen2.5:latest"
     assert captured["base_url"] == "http://127.0.0.1:11434"

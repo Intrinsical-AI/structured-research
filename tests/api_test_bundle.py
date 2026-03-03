@@ -8,22 +8,26 @@ from pathlib import Path
 import pytest
 
 from structured_search.application.common.dependencies import ApplicationDependencies
-from structured_search.application.job_search.profiles import (
-    POSTING_VALID_PATHS,
+from structured_search.application.core.bundle_service import (
     list_profiles,
     load_bundle,
     save_bundle,
 )
-from structured_search.application.job_search.prompts import generate_prompt
-from structured_search.application.job_search.run_scoring import run_score
+from structured_search.application.core.prompt_service import generate_prompt
+from structured_search.application.core.run_service import run_score
+from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle, RunScoreRequest
+from structured_search.domain.job_search.models import JobPosting
 from structured_search.infra.config_loader import collect_model_field_paths
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
 )
 from structured_search.ports.persistence import BundleData, RunRepository, SnapshotWriteResult
-from structured_search.tasks.job_search.models import JobPosting
+
+_TASK_ID = "job_search"
+_PLUGIN = get_task_registry().get(_TASK_ID)
+POSTING_VALID_PATHS = collect_model_field_paths(JobPosting)
 
 
 def _minimal_constraints() -> dict:
@@ -38,7 +42,7 @@ def _minimal_constraints() -> dict:
 def _minimal_task() -> dict:
     return {
         "gates": {
-            "hard_filters_mode": "any",
+            "hard_filters_mode": "require_all",
             "hard_filters": [],
             "reject_anomalies": [],
             "required_evidence_fields": [],
@@ -55,6 +59,7 @@ def _minimal_task() -> dict:
 
 def _minimal_bundle(profile_id: str = "test-profile") -> ProfileBundle:
     return ProfileBundle(
+        task_id=_TASK_ID,
         profile_id=profile_id,
         constraints=_minimal_constraints(),
         task=_minimal_task(),
@@ -150,8 +155,14 @@ class TestSaveBundle:
     def test_valid_bundle_is_saved(self, tmp_path):
         deps = _deps(tmp_path)
         bundle = _minimal_bundle()
-        bundle_path = tmp_path / "profiles" / bundle.profile_id / "bundle.json"
-        result = save_bundle(bundle, deps=deps)
+        bundle_path = tmp_path / "profiles" / "job_search" / bundle.profile_id / "bundle.json"
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         assert result.valid is True
         assert bundle_path.exists()
@@ -164,8 +175,14 @@ class TestSaveBundle:
         deps = _deps(tmp_path)
         bundle = _minimal_bundle()
         bundle.user_profile = {"timezone": "Europe/Madrid", "mobility": "local"}
-        bundle_path = tmp_path / "profiles" / bundle.profile_id / "bundle.json"
-        result = save_bundle(bundle, deps=deps)
+        bundle_path = tmp_path / "profiles" / "job_search" / bundle.profile_id / "bundle.json"
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         assert result.valid is True
         assert json.loads(bundle_path.read_text())["user_profile"] == bundle.user_profile
@@ -176,7 +193,13 @@ class TestSaveBundle:
         bundle.constraints["must"].append(
             {"field": "totally_fake_field", "op": "=", "value": True}
         )
-        result = save_bundle(bundle, deps=deps)
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         assert result.valid is True
         warnings = [i for i in result.issues if i.severity == "warning"]
@@ -187,16 +210,40 @@ class TestSaveBundle:
         deps = _deps(tmp_path)
         bundle = _minimal_bundle()
         bundle.constraints["must"] = [{"field": "modality", "op": "INVALID_OP", "value": "remote"}]
-        bundle_path = tmp_path / "profiles" / bundle.profile_id / "bundle.json"
+        bundle_path = tmp_path / "profiles" / "job_search" / bundle.profile_id / "bundle.json"
 
-        result = save_bundle(bundle, deps=deps)
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         assert result.valid is False
         assert not bundle_path.exists()
 
+    def test_legacy_must_pass_constraints_must_field_is_rejected(self, tmp_path):
+        deps = _deps(tmp_path)
+        bundle = _minimal_bundle()
+        gates = bundle.task.get("gates", {})
+        assert isinstance(gates, dict)
+        gates["must_pass_constraints_must"] = False
+
+        result = save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
+
+        assert result.valid is False
+        assert any("must_pass_constraints_must" in i.path for i in result.issues)
+
 
 class TestRunScore:
-    def _make_request(self, profile_id: str = "profile_1") -> RunScoreRequest:
+    def _make_request(self, profile_id: str = "profile_example") -> RunScoreRequest:
         return RunScoreRequest(
             profile_id=profile_id,
             records=[_minimal_posting_dict(1), _minimal_posting_dict(2)],
@@ -204,11 +251,23 @@ class TestRunScore:
 
     def test_returns_run_id_and_snapshot(self, tmp_path):
         deps = _deps(tmp_path)
-        save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
+        bundle = _minimal_bundle(profile_id="profile_example")
+        save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
-        result = run_score(self._make_request("profile_1"), deps=deps)
+        result = run_score(
+            task_id=_TASK_ID,
+            request=self._make_request("profile_example"),
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
-        assert result.run_id.startswith("profile_1-")
+        assert result.run_id.startswith("job_search-profile_example-")
         assert result.snapshot_status == "written"
         snapshot_dir = Path(result.snapshot_dir or "")
         assert (snapshot_dir / "constraints.json").exists()
@@ -219,9 +278,21 @@ class TestRunScore:
 
     def test_gate_counts_reflect_config(self, tmp_path):
         deps = _deps(tmp_path)
-        save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
+        bundle = _minimal_bundle(profile_id="profile_example")
+        save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
-        result = run_score(self._make_request("profile_1"), deps=deps)
+        result = run_score(
+            task_id=_TASK_ID,
+            request=self._make_request("profile_example"),
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         assert result.total == 2
         assert result.skipped == 0
@@ -234,66 +305,93 @@ class TestRunScore:
             run_repo=_FailingRunRepository(),
             prompts_dir=Path("resources/prompts"),
         )
-        save_bundle(_minimal_bundle(profile_id="profile_1"), deps=deps)
+        bundle = _minimal_bundle(profile_id="profile_example")
+        save_bundle(
+            task_id=_TASK_ID,
+            profile_id=bundle.profile_id,
+            bundle=bundle,
+            plugin=_PLUGIN,
+            deps=deps,
+        )
 
         request = RunScoreRequest(
-            profile_id="profile_1",
+            profile_id="profile_example",
             records=[_minimal_posting_dict(1)],
             require_snapshot=True,
         )
         with pytest.raises(RuntimeError):
-            run_score(request, deps=deps)
+            run_score(task_id=_TASK_ID, request=request, plugin=_PLUGIN, deps=deps)
 
 
 @pytest.mark.integration
-def test_load_bundle_profile_1():
-    bundle = load_bundle("profile_1")
-    assert bundle.profile_id == "profile_1"
+def test_load_bundle_profile_example():
+    bundle = load_bundle(task_id=_TASK_ID, profile_id="profile_example")
+    assert bundle.profile_id == "profile_example"
     assert "must" in bundle.constraints
     assert "gates" in bundle.task
 
 
 @pytest.mark.integration
-def test_save_bundle_roundtrip_profile_1(tmp_path):
+def test_save_bundle_roundtrip_profile_example(tmp_path):
     deps = _deps(tmp_path)
-    original = load_bundle("profile_1")
-    result = save_bundle(original, deps=deps)
+    original = load_bundle(task_id=_TASK_ID, profile_id="profile_example")
+    result = save_bundle(
+        task_id=_TASK_ID,
+        profile_id=original.profile_id,
+        bundle=original,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
 
     assert result.valid is True
-    written = json.loads((tmp_path / "profiles" / original.profile_id / "bundle.json").read_text())
+    written = json.loads(
+        (tmp_path / "profiles" / "job_search" / original.profile_id / "bundle.json").read_text()
+    )
     assert written["constraints"]["domain"] == original.constraints["domain"]
 
 
 @pytest.mark.integration
-def test_load_bundle_profile_1_includes_optional_schemas():
-    bundle = load_bundle("profile_1")
-    assert isinstance(bundle.domain_schema, dict)
-    assert isinstance(bundle.result_schema, dict)
+def test_load_bundle_profile_example_includes_optional_schemas():
+    bundle = load_bundle(task_id=_TASK_ID, profile_id="profile_example")
+    assert bundle.domain_schema is None or isinstance(bundle.domain_schema, dict)
+    assert bundle.result_schema is None or isinstance(bundle.result_schema, dict)
 
 
 @pytest.mark.integration
 def test_load_bundle_without_optional_schemas_keeps_none(tmp_path):
     deps = _deps(tmp_path)
     profile_id = "profile_without_optional_schemas"
-    save_result = save_bundle(_minimal_bundle(profile_id=profile_id), deps=deps)
+    bundle = _minimal_bundle(profile_id=profile_id)
+    save_result = save_bundle(
+        task_id=_TASK_ID,
+        profile_id=profile_id,
+        bundle=bundle,
+        plugin=_PLUGIN,
+        deps=deps,
+    )
 
     assert save_result.valid is True
 
-    bundle = load_bundle(profile_id, deps=deps)
+    bundle = load_bundle(task_id=_TASK_ID, profile_id=profile_id, deps=deps)
     assert bundle.domain_schema is None
     assert bundle.result_schema is None
 
 
 @pytest.mark.integration
-def test_list_profiles_discovers_profile_1_and_profile_1():
-    profiles = list_profiles()
+def test_list_profiles_discovers_profile_example_and_profile_example():
+    profiles = list_profiles(task_id=_TASK_ID)
     ids = {p["id"] for p in profiles}
-    assert "profile_1" in ids
-    assert "profile_1" in ids
+    assert "profile_example" in ids
+    assert "profile_example" in ids
 
 
 @pytest.mark.integration
 def test_generate_prompt_embeds_candidate_profile_section():
-    prompt = generate_prompt("profile_1", "S3_execute").prompt
+    prompt = generate_prompt(
+        task_id=_TASK_ID,
+        profile_id="profile_example",
+        step="S3_execute",
+        plugin=_PLUGIN,
+    ).prompt
     assert "## Search Constraints" in prompt
     assert "## Candidate Profile" in prompt

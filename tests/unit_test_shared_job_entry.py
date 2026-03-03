@@ -1,8 +1,8 @@
 """Compatibility tests for shared BaseJobEntry extraction."""
 
-from structured_search.tasks.common.models import BaseJobEntry as SharedBaseJobEntry
-from structured_search.tasks.gen_cv.models import JobDescription
-from structured_search.tasks.job_search.models import (
+from structured_search.domain.common.models import BaseJobEntry as SharedBaseJobEntry
+from structured_search.domain.gen_cv.models import JobDescription
+from structured_search.domain.job_search.models import (
     BaseJobEntry as JobSearchBaseJobEntry,
 )
 
