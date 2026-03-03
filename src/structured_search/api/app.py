@@ -1,9 +1,10 @@
-"""FastAPI application exposing structured-search HTTP endpoints."""
+"""FastAPI application exposing task-scoped structured-search HTTP endpoints."""
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,15 +20,15 @@ from structured_search.application.common.dependencies import (
     configure_filesystem_dependencies,
 )
 from structured_search.application.common.metrics import emit_q2_metric_event
-from structured_search.application.gen_cv.generate_cv import gen_cv
-from structured_search.application.job_search.ingest import ingest_validate_jsonl
-from structured_search.application.job_search.profiles import (
+from structured_search.application.core.bundle_service import (
     list_profiles,
     load_bundle,
     save_bundle,
 )
-from structured_search.application.job_search.prompts import generate_prompt
-from structured_search.application.job_search.run_scoring import run_score, validate_run
+from structured_search.application.core.ingest_service import ingest_validate_jsonl
+from structured_search.application.core.prompt_service import generate_prompt
+from structured_search.application.core.run_service import run_score, validate_run
+from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import (
     BundleSaveResponse,
     BundleWriteResponse,
@@ -42,18 +43,18 @@ from structured_search.contracts import (
     RunScoreRequest,
     RunScoreResponse,
     RunValidateSummary,
+    TaskSummary,
 )
 
 logger = logging.getLogger(__name__)
 
-_PROFILES_BASE = Path("config/job_search")
+_PROFILES_BASE = Path(os.getenv("PROFILES_BASE", "config"))
 _PROMPTS_DIR = Path("resources/prompts")
 _RUNS_DIR = Path("runs")
 
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Wire explicit dependencies for the whole API process lifecycle."""
     configure_filesystem_dependencies(
         profiles_base=_PROFILES_BASE,
         runs_dir=_RUNS_DIR,
@@ -67,8 +68,8 @@ async def _lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="structured-search API",
-    version="0.2.0",
-    description="HTTP API for structured, auditable search workflows.",
+    version="0.3.0",
+    description="Task-scoped HTTP API for structured, auditable search workflows.",
     lifespan=_lifespan,
 )
 
@@ -88,35 +89,67 @@ def _emit_metric_event(event_type: str, **fields: Any) -> None:
         logger.warning("Failed to emit metric event '%s': %s", event_type, exc)
 
 
-@app.get(
-    "/v1/job-search/profiles",
-    response_model=list[ProfileSummary],
-    summary="List available job_search profiles",
-)
-def get_profiles() -> list[ProfileSummary]:
-    return list_profiles()
-
-
-@app.get(
-    "/v1/job-search/profiles/{profile_id}/bundle",
-    response_model=ProfileBundle,
-    summary="Load a profile bundle (constraints + task + task_config + optional sections)",
-)
-def get_bundle(profile_id: str) -> ProfileBundle:
+def _resolve_plugin(task_id: str):
+    registry = get_task_registry()
     try:
-        return load_bundle(profile_id)
-    except FileNotFoundError as exc:
+        return registry.get(task_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _require_capability(task_id: str, capability: str):
+    plugin = _resolve_plugin(task_id)
+    if not plugin.supports(capability):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Task {task_id!r} does not support capability {capability!r}",
+        )
+    return plugin
+
+
+@app.get("/v1/tasks", response_model=list[TaskSummary], summary="List registered tasks")
+def get_tasks() -> list[TaskSummary]:
+    return get_task_registry().list()
+
+
+@app.get(
+    "/v1/tasks/{task_id}/profiles",
+    response_model=list[ProfileSummary],
+    summary="List available profiles for one task",
+)
+def get_profiles(task_id: str) -> list[ProfileSummary]:
+    _resolve_plugin(task_id)
+    return [ProfileSummary.model_validate(item) for item in list_profiles(task_id=task_id)]
+
+
+@app.get(
+    "/v1/tasks/{task_id}/profiles/{profile_id}/bundle",
+    response_model=ProfileBundle,
+    summary="Load a task/profile bundle",
+)
+def get_bundle(task_id: str, profile_id: str) -> ProfileBundle:
+    _resolve_plugin(task_id)
+    try:
+        return load_bundle(task_id=task_id, profile_id=profile_id)
+    except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.put(
-    "/v1/job-search/profiles/{profile_id}/bundle",
+    "/v1/tasks/{task_id}/profiles/{profile_id}/bundle",
     response_model=BundleWriteResponse,
-    summary="Validate and save a profile bundle",
+    summary="Validate and save a task/profile bundle",
 )
-def put_bundle(profile_id: str, bundle: ProfileBundle) -> dict[str, Any]:
+def put_bundle(task_id: str, profile_id: str, bundle: ProfileBundle) -> dict[str, Any]:
+    plugin = _resolve_plugin(task_id)
+    bundle.task_id = task_id
     bundle.profile_id = profile_id
-    result: BundleSaveResponse = save_bundle(bundle)
+    result: BundleSaveResponse = save_bundle(
+        task_id=task_id,
+        profile_id=profile_id,
+        bundle=bundle,
+        plugin=plugin,
+    )
     if result.valid:
         return BundleWriteResponse(
             ok=True,
@@ -127,13 +160,19 @@ def put_bundle(profile_id: str, bundle: ProfileBundle) -> dict[str, Any]:
 
 
 @app.post(
-    "/v1/job-search/prompt/generate",
+    "/v1/tasks/{task_id}/prompt/generate",
     response_model=PromptGenerateResponse,
-    summary="Compose an extraction prompt for a profile and step",
+    summary="Compose an extraction prompt for a task/profile and step",
 )
-def post_generate_prompt(request: PromptGenerateRequest) -> dict[str, Any]:
+def post_generate_prompt(task_id: str, request: PromptGenerateRequest) -> dict[str, Any]:
+    plugin = _require_capability(task_id, "prompt")
     try:
-        result = generate_prompt(request.profile_id, request.step)
+        result = generate_prompt(
+            task_id=task_id,
+            profile_id=request.profile_id,
+            step=request.step,
+            plugin=plugin,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -149,12 +188,16 @@ def post_generate_prompt(request: PromptGenerateRequest) -> dict[str, Any]:
 
 
 @app.post(
-    "/v1/job-search/jsonl/validate",
+    "/v1/tasks/{task_id}/jsonl/validate",
     response_model=JsonlValidateResponse,
-    summary="Parse JSONL tolerantly and validate records against JobPosting schema",
+    summary="Parse JSONL tolerantly and validate records against task schema",
 )
-def post_jsonl_validate(request: JsonlValidateRequest) -> dict[str, Any]:
-    result = ingest_validate_jsonl(request.raw_jsonl)
+def post_jsonl_validate(task_id: str, request: JsonlValidateRequest) -> dict[str, Any]:
+    plugin = _require_capability(task_id, "jsonl_validate")
+    if plugin.record_model is None:
+        raise HTTPException(status_code=422, detail=f"Task {task_id!r} has no record model")
+
+    result = ingest_validate_jsonl(raw_text=request.raw_jsonl, record_model=plugin.record_model)
     invalid_records = [
         {
             "line": err.line_no,
@@ -178,7 +221,8 @@ def post_jsonl_validate(request: JsonlValidateRequest) -> dict[str, Any]:
     total_lines = response.metrics.total_lines
     parse_errors = result.stats.parse_errors
     _emit_metric_event(
-        "job_search_jsonl_validate",
+        "task_jsonl_validate",
+        task_id=task_id,
         profile_id=request.profile_id,
         total_lines=total_lines,
         parse_errors=parse_errors,
@@ -188,39 +232,47 @@ def post_jsonl_validate(request: JsonlValidateRequest) -> dict[str, Any]:
 
 
 @app.post(
-    "/v1/job-search/run/validate",
+    "/v1/tasks/{task_id}/run/validate",
     response_model=RunValidateSummary,
-    summary="Dry-run validation for /run prerequisites without scoring",
+    summary="Dry-run validation for run prerequisites without scoring",
     responses={
-        404: {"description": "Profile not found"},
-        422: {"description": "Validation/config error in request or profile task"},
+        404: {"description": "Task/profile not found"},
+        422: {"description": "Validation/config error"},
     },
 )
-def post_run_validate(request: RunScoreRequest) -> RunValidateSummary:
+def post_task_run_validate(
+    task_id: str,
+    request: RunScoreRequest,
+) -> RunValidateSummary:
+    plugin = _require_capability(task_id, "run")
     try:
-        result = validate_run(request)
+        return validate_run(task_id=task_id, request=request, plugin=plugin)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValidationError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return result
 
 
 @app.post(
-    "/v1/job-search/run",
+    "/v1/tasks/{task_id}/run",
     response_model=RunScoreResponse,
-    summary="Score pre-validated records using profile task config",
+    summary="Score pre-validated records using task profile runtime config",
     responses={
-        404: {"description": "Profile not found"},
-        422: {"description": "Validation/config error in request or profile task"},
-        500: {"description": "Run failed (e.g. required snapshot write failure)"},
+        404: {"description": "Task/profile not found"},
+        422: {"description": "Validation/config error"},
+        500: {"description": "Run failed"},
     },
 )
-def post_run(request: RunScoreRequest) -> dict[str, Any]:
+def post_task_run(
+    task_id: str,
+    request: RunScoreRequest,
+) -> dict[str, Any]:
+    plugin = _require_capability(task_id, "run")
+
     started_at = datetime.now(UTC)
     started_clock = perf_counter()
     try:
-        result = run_score(request)
+        result = run_score(task_id=task_id, request=request, plugin=plugin)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValidationError, ValueError) as exc:
@@ -231,7 +283,8 @@ def post_run(request: RunScoreRequest) -> dict[str, Any]:
     latency_ms = round((perf_counter() - started_clock) * 1000, 3)
 
     _emit_metric_event(
-        "job_search_run",
+        "task_run",
+        task_id=task_id,
         profile_id=result.profile_id,
         run_id=result.run_id,
         latency_ms=latency_ms,
@@ -247,6 +300,11 @@ def post_run(request: RunScoreRequest) -> dict[str, Any]:
             "loaded": result.total,
             "processed": len(result.records),
             "skipped": result.skipped,
+            "gate_passed": result.gate_passed,
+            "gate_failed": result.gate_failed,
+            "gate_pass_rate": (
+                (result.gate_passed / len(result.records)) if result.records else 0.0
+            ),
             "started_at": started_at.isoformat(),
             "finished_at": finished_at.isoformat(),
         },
@@ -259,18 +317,25 @@ def post_run(request: RunScoreRequest) -> dict[str, Any]:
 
 
 @app.post(
-    "/v1/gen-cv",
+    "/v1/tasks/{task_id}/actions/gen-cv",
     response_model=GenCVResponse,
     summary="Generate a CV markdown and structured JSON",
     responses={
-        404: {"description": "Profile not found"},
+        404: {"description": "Task/profile not found"},
         422: {"description": "Validation error in request payload"},
         503: {"description": "CV provider unavailable"},
     },
 )
-def post_gen_cv(request: GenCVRequest) -> GenCVResponse:
+def post_action_gen_cv(task_id: str, request: GenCVRequest) -> GenCVResponse:
+    plugin = _require_capability(task_id, "action:gen-cv")
+    handler = plugin.action_handlers.get("gen-cv")
+    if handler is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Task {task_id!r} does not expose action 'gen-cv'",
+        )
     try:
-        response = gen_cv(
+        response = handler(
             profile_id=request.profile_id,
             job=request.job,
             candidate_profile=request.candidate_profile,
@@ -288,6 +353,7 @@ def post_gen_cv(request: GenCVRequest) -> GenCVResponse:
     fallback_used = bool((response.model_info or {}).get("fallback_used"))
     _emit_metric_event(
         "gen_cv",
+        task_id=task_id,
         profile_id=request.profile_id,
         fallback_used=fallback_used,
         llm_model=request.llm_model,

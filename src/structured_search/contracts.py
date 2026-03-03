@@ -16,9 +16,18 @@ class ValidationIssue(BaseModel):
     severity: Literal["error", "warning"] = "error"
 
 
-class ProfileBundle(BaseModel):
-    """All editable config for one search profile."""
+class TaskSummary(BaseModel):
+    """Summary item from GET /v1/tasks."""
 
+    task_id: str
+    name: str
+    capabilities: list[str] = Field(default_factory=list)
+
+
+class ProfileBundle(BaseModel):
+    """All editable config for one task/profile."""
+
+    task_id: str = "job_search"
     profile_id: str
     constraints: dict[str, Any]
     task: dict[str, Any]
@@ -29,7 +38,7 @@ class ProfileBundle(BaseModel):
 
 
 class ProfileSummary(BaseModel):
-    """Summary item from GET /v1/job-search/profiles."""
+    """Summary item from GET /v1/tasks/{task_id}/profiles."""
 
     id: str
     name: str
@@ -37,14 +46,14 @@ class ProfileSummary(BaseModel):
 
 
 class BundleSaveResponse(BaseModel):
-    """Response from PUT /v1/job-search/profiles/{id}/bundle."""
+    """Response from PUT bundle endpoint."""
 
     valid: bool
     issues: list[ValidationIssue]
 
 
 class BundleWriteResponse(BaseModel):
-    """HTTP response body for PUT /v1/job-search/profiles/{id}/bundle."""
+    """HTTP response body for PUT bundle endpoint."""
 
     ok: bool
     version: str | None = None
@@ -52,7 +61,7 @@ class BundleWriteResponse(BaseModel):
 
 
 class PromptResponse(BaseModel):
-    """Response from POST /v1/job-search/prompt/generate."""
+    """Prompt payload used by application services."""
 
     profile_id: str
     step: str
@@ -60,14 +69,14 @@ class PromptResponse(BaseModel):
 
 
 class PromptGenerateRequest(BaseModel):
-    """Request body for POST /v1/job-search/prompt/generate."""
+    """Request body for POST prompt generation."""
 
     profile_id: str
     step: str = "S3_execute"
 
 
 class PromptGenerateResponse(BaseModel):
-    """HTTP response body for POST /v1/job-search/prompt/generate."""
+    """HTTP response body for POST prompt generation."""
 
     profile_id: str
     step: str
@@ -94,7 +103,7 @@ class IngestStats(BaseModel):
 
 
 class IngestResult(BaseModel):
-    """Response from POST /v1/job-search/jsonl/validate."""
+    """Result from JSONL validation."""
 
     valid: list[dict[str, Any]]
     invalid: list[IngestError]
@@ -102,14 +111,14 @@ class IngestResult(BaseModel):
 
 
 class JsonlValidateRequest(BaseModel):
-    """Request body for POST /v1/job-search/jsonl/validate."""
+    """Request body for POST JSONL validation."""
 
     profile_id: str
     raw_jsonl: str
 
 
 class JsonlInvalidRecord(BaseModel):
-    """Invalid record payload shape returned by /v1/job-search/jsonl/validate."""
+    """Invalid record payload shape returned by JSONL validation."""
 
     line: int
     error: str
@@ -118,7 +127,7 @@ class JsonlInvalidRecord(BaseModel):
 
 
 class JsonlValidateMetrics(BaseModel):
-    """Validation metrics returned by /v1/job-search/jsonl/validate."""
+    """Validation metrics returned by JSONL validation."""
 
     total_lines: int
     json_valid_lines: int
@@ -127,7 +136,7 @@ class JsonlValidateMetrics(BaseModel):
 
 
 class JsonlValidateResponse(BaseModel):
-    """HTTP response body for POST /v1/job-search/jsonl/validate."""
+    """HTTP response body for JSONL validation."""
 
     valid_records: list[dict[str, Any]]
     invalid_records: list[JsonlInvalidRecord]
@@ -135,7 +144,7 @@ class JsonlValidateResponse(BaseModel):
 
 
 class RunScoreRequest(BaseModel):
-    """Request body for POST /v1/job-search/run (canonical)."""
+    """Request body for POST run."""
 
     profile_id: str
     records: list[dict[str, Any]]
@@ -148,7 +157,7 @@ class RunScoreRequest(BaseModel):
 
 
 class RunSummary(BaseModel):
-    """Internal run summary used by the service and API handlers."""
+    """Internal run summary used by services and API handlers."""
 
     run_id: str
     profile_id: str
@@ -164,17 +173,20 @@ class RunSummary(BaseModel):
 
 
 class RunResponseMetrics(BaseModel):
-    """Response metrics from POST /v1/job-search/run."""
+    """Response metrics from POST run."""
 
     loaded: int
     processed: int
     skipped: int
+    gate_passed: int
+    gate_failed: int
+    gate_pass_rate: float
     started_at: str
     finished_at: str
 
 
 class RunScoreResponse(BaseModel):
-    """HTTP response body for POST /v1/job-search/run."""
+    """HTTP response body for POST run."""
 
     run_id: str
     profile_id: str
@@ -187,7 +199,7 @@ class RunScoreResponse(BaseModel):
 
 
 class RunValidateChecks(BaseModel):
-    """Validation checks executed by dry-run validation for /v1/job-search/run."""
+    """Validation checks executed by dry-run validation for /run."""
 
     profile_exists: bool
     constraints_valid: bool
@@ -198,7 +210,7 @@ class RunValidateChecks(BaseModel):
 
 
 class RunValidateSummary(BaseModel):
-    """Dry-run summary for validating whether /v1/job-search/run can execute."""
+    """Dry-run summary for validating whether /run can execute."""
 
     ok: bool
     profile_id: str
@@ -212,7 +224,7 @@ class RunValidateSummary(BaseModel):
 
 
 class CvSkillSetInput(BaseModel):
-    """External candidate skill shape for POST /v1/gen-cv."""
+    """External candidate skill shape for gen-cv action."""
 
     languages: list[str] = Field(default_factory=list)
     frameworks: list[str] = Field(default_factory=list)
@@ -221,7 +233,7 @@ class CvSkillSetInput(BaseModel):
 
 
 class CvExperienceInput(BaseModel):
-    """External candidate experience entry for POST /v1/gen-cv."""
+    """External candidate experience entry for gen-cv action."""
 
     company: str
     title: str
@@ -231,7 +243,7 @@ class CvExperienceInput(BaseModel):
 
 
 class CvCandidateInput(BaseModel):
-    """External candidate payload for POST /v1/gen-cv."""
+    """External candidate payload for gen-cv action."""
 
     id: str | None = None
     name: str | None = None
@@ -247,7 +259,7 @@ class CvCandidateInput(BaseModel):
 
 
 class GenCVRequest(BaseModel):
-    """Request body for POST /v1/gen-cv."""
+    """Request body for POST /v1/tasks/{task_id}/actions/gen-cv."""
 
     profile_id: str
     job: dict[str, Any]
@@ -258,7 +270,7 @@ class GenCVRequest(BaseModel):
 
 
 class GenCVResponse(BaseModel):
-    """Response from POST /v1/gen-cv."""
+    """Response body for gen-cv action."""
 
     cv_markdown: str
     generated_cv_json: dict[str, Any] | None = None

@@ -2,14 +2,14 @@
   "openapi": "3.1.0",
   "info": {
     "title": "structured-search API",
-    "description": "HTTP API for structured, auditable search workflows.",
-    "version": "0.2.0"
+    "description": "Task-scoped HTTP API for structured, auditable search workflows.",
+    "version": "0.3.0"
   },
   "paths": {
-    "/v1/job-search/profiles": {
+    "/v1/tasks": {
       "get": {
-        "summary": "List available job_search profiles",
-        "operationId": "get_profiles_v1_job_search_profiles_get",
+        "summary": "List registered tasks",
+        "operationId": "get_tasks_v1_tasks_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -17,10 +17,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ProfileSummary"
+                    "$ref": "#/components/schemas/TaskSummary"
                   },
                   "type": "array",
-                  "title": "Response Get Profiles V1 Job Search Profiles Get"
+                  "title": "Response Get Tasks V1 Tasks Get"
                 }
               }
             }
@@ -28,11 +28,63 @@
         }
       }
     },
-    "/v1/job-search/profiles/{profile_id}/bundle": {
+    "/v1/tasks/{task_id}/profiles": {
       "get": {
-        "summary": "Load a profile bundle (constraints + task + task_config + optional sections)",
-        "operationId": "get_bundle_v1_job_search_profiles__profile_id__bundle_get",
+        "summary": "List available profiles for one task",
+        "operationId": "get_profiles_v1_tasks__task_id__profiles_get",
         "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileSummary"
+                  },
+                  "title": "Response Get Profiles V1 Tasks  Task Id  Profiles Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}/profiles/{profile_id}/bundle": {
+      "get": {
+        "summary": "Load a task/profile bundle",
+        "operationId": "get_bundle_v1_tasks__task_id__profiles__profile_id__bundle_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
           {
             "name": "profile_id",
             "in": "path",
@@ -67,9 +119,18 @@
         }
       },
       "put": {
-        "summary": "Validate and save a profile bundle",
-        "operationId": "put_bundle_v1_job_search_profiles__profile_id__bundle_put",
+        "summary": "Validate and save a task/profile bundle",
+        "operationId": "put_bundle_v1_tasks__task_id__profiles__profile_id__bundle_put",
         "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
           {
             "name": "profile_id",
             "in": "path",
@@ -114,19 +175,30 @@
         }
       }
     },
-    "/v1/job-search/prompt/generate": {
+    "/v1/tasks/{task_id}/prompt/generate": {
       "post": {
-        "summary": "Compose an extraction prompt for a profile and step",
-        "operationId": "post_generate_prompt_v1_job_search_prompt_generate_post",
+        "summary": "Compose an extraction prompt for a task/profile and step",
+        "operationId": "post_generate_prompt_v1_tasks__task_id__prompt_generate_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PromptGenerateRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -152,19 +224,30 @@
         }
       }
     },
-    "/v1/job-search/jsonl/validate": {
+    "/v1/tasks/{task_id}/jsonl/validate": {
       "post": {
-        "summary": "Parse JSONL tolerantly and validate records against JobPosting schema",
-        "operationId": "post_jsonl_validate_v1_job_search_jsonl_validate_post",
+        "summary": "Parse JSONL tolerantly and validate records against task schema",
+        "operationId": "post_jsonl_validate_v1_tasks__task_id__jsonl_validate_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/JsonlValidateRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -190,19 +273,30 @@
         }
       }
     },
-    "/v1/job-search/run/validate": {
+    "/v1/tasks/{task_id}/run/validate": {
       "post": {
-        "summary": "Dry-run validation for /run prerequisites without scoring",
-        "operationId": "post_run_validate_v1_job_search_run_validate_post",
+        "summary": "Dry-run validation for run prerequisites without scoring",
+        "operationId": "post_task_run_validate_v1_tasks__task_id__run_validate_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RunScoreRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -216,27 +310,38 @@
             }
           },
           "404": {
-            "description": "Profile not found"
+            "description": "Task/profile not found"
           },
           "422": {
-            "description": "Validation/config error in request or profile task"
+            "description": "Validation/config error"
           }
         }
       }
     },
-    "/v1/job-search/run": {
+    "/v1/tasks/{task_id}/run": {
       "post": {
-        "summary": "Score pre-validated records using profile task config",
-        "operationId": "post_run_v1_job_search_run_post",
+        "summary": "Score pre-validated records using task profile runtime config",
+        "operationId": "post_task_run_v1_tasks__task_id__run_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RunScoreRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -250,30 +355,41 @@
             }
           },
           "404": {
-            "description": "Profile not found"
+            "description": "Task/profile not found"
           },
           "422": {
-            "description": "Validation/config error in request or profile task"
+            "description": "Validation/config error"
           },
           "500": {
-            "description": "Run failed (e.g. required snapshot write failure)"
+            "description": "Run failed"
           }
         }
       }
     },
-    "/v1/gen-cv": {
+    "/v1/tasks/{task_id}/actions/gen-cv": {
       "post": {
         "summary": "Generate a CV markdown and structured JSON",
-        "operationId": "post_gen_cv_v1_gen_cv_post",
+        "operationId": "post_action_gen_cv_v1_tasks__task_id__actions_gen_cv_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GenCVRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -287,7 +403,7 @@
             }
           },
           "404": {
-            "description": "Profile not found"
+            "description": "Task/profile not found"
           },
           "422": {
             "description": "Validation error in request payload"
@@ -331,7 +447,7 @@
           "ok"
         ],
         "title": "BundleWriteResponse",
-        "description": "HTTP response body for PUT /v1/job-search/profiles/{id}/bundle."
+        "description": "HTTP response body for PUT bundle endpoint."
       },
       "CvCandidateInput": {
         "properties": {
@@ -438,7 +554,7 @@
           "seniority"
         ],
         "title": "CvCandidateInput",
-        "description": "External candidate payload for POST /v1/gen-cv."
+        "description": "External candidate payload for gen-cv action."
       },
       "CvExperienceInput": {
         "properties": {
@@ -482,7 +598,7 @@
           "title"
         ],
         "title": "CvExperienceInput",
-        "description": "External candidate experience entry for POST /v1/gen-cv."
+        "description": "External candidate experience entry for gen-cv action."
       },
       "CvSkillSetInput": {
         "properties": {
@@ -517,7 +633,7 @@
         },
         "type": "object",
         "title": "CvSkillSetInput",
-        "description": "External candidate skill shape for POST /v1/gen-cv."
+        "description": "External candidate skill shape for gen-cv action."
       },
       "GenCVRequest": {
         "properties": {
@@ -571,7 +687,7 @@
           "candidate_profile"
         ],
         "title": "GenCVRequest",
-        "description": "Request body for POST /v1/gen-cv."
+        "description": "Request body for POST /v1/tasks/{task_id}/actions/gen-cv."
       },
       "GenCVResponse": {
         "properties": {
@@ -609,7 +725,7 @@
           "cv_markdown"
         ],
         "title": "GenCVResponse",
-        "description": "Response from POST /v1/gen-cv."
+        "description": "Response body for gen-cv action."
       },
       "HTTPValidationError": {
         "properties": {
@@ -690,7 +806,7 @@
           "kind"
         ],
         "title": "JsonlInvalidRecord",
-        "description": "Invalid record payload shape returned by /v1/job-search/jsonl/validate."
+        "description": "Invalid record payload shape returned by JSONL validation."
       },
       "JsonlValidateMetrics": {
         "properties": {
@@ -719,7 +835,7 @@
           "invalid_lines"
         ],
         "title": "JsonlValidateMetrics",
-        "description": "Validation metrics returned by /v1/job-search/jsonl/validate."
+        "description": "Validation metrics returned by JSONL validation."
       },
       "JsonlValidateRequest": {
         "properties": {
@@ -738,7 +854,7 @@
           "raw_jsonl"
         ],
         "title": "JsonlValidateRequest",
-        "description": "Request body for POST /v1/job-search/jsonl/validate."
+        "description": "Request body for POST JSONL validation."
       },
       "JsonlValidateResponse": {
         "properties": {
@@ -768,10 +884,15 @@
           "metrics"
         ],
         "title": "JsonlValidateResponse",
-        "description": "HTTP response body for POST /v1/job-search/jsonl/validate."
+        "description": "HTTP response body for JSONL validation."
       },
       "ProfileBundle": {
         "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "default": "job_search"
+          },
           "profile_id": {
             "type": "string",
             "title": "Profile Id"
@@ -836,7 +957,7 @@
           "task_config"
         ],
         "title": "ProfileBundle",
-        "description": "All editable config for one search profile."
+        "description": "All editable config for one task/profile."
       },
       "ProfileSummary": {
         "properties": {
@@ -860,7 +981,7 @@
           "updated_at"
         ],
         "title": "ProfileSummary",
-        "description": "Summary item from GET /v1/job-search/profiles."
+        "description": "Summary item from GET /v1/tasks/{task_id}/profiles."
       },
       "PromptGenerateRequest": {
         "properties": {
@@ -879,7 +1000,7 @@
           "profile_id"
         ],
         "title": "PromptGenerateRequest",
-        "description": "Request body for POST /v1/job-search/prompt/generate."
+        "description": "Request body for POST prompt generation."
       },
       "PromptGenerateResponse": {
         "properties": {
@@ -913,7 +1034,7 @@
           "prompt_hash"
         ],
         "title": "PromptGenerateResponse",
-        "description": "HTTP response body for POST /v1/job-search/prompt/generate."
+        "description": "HTTP response body for POST prompt generation."
       },
       "RunResponseMetrics": {
         "properties": {
@@ -929,6 +1050,18 @@
             "type": "integer",
             "title": "Skipped"
           },
+          "gate_passed": {
+            "type": "integer",
+            "title": "Gate Passed"
+          },
+          "gate_failed": {
+            "type": "integer",
+            "title": "Gate Failed"
+          },
+          "gate_pass_rate": {
+            "type": "number",
+            "title": "Gate Pass Rate"
+          },
           "started_at": {
             "type": "string",
             "title": "Started At"
@@ -943,11 +1076,14 @@
           "loaded",
           "processed",
           "skipped",
+          "gate_passed",
+          "gate_failed",
+          "gate_pass_rate",
           "started_at",
           "finished_at"
         ],
         "title": "RunResponseMetrics",
-        "description": "Response metrics from POST /v1/job-search/run."
+        "description": "Response metrics from POST run."
       },
       "RunScoreRequest": {
         "properties": {
@@ -976,7 +1112,7 @@
           "records"
         ],
         "title": "RunScoreRequest",
-        "description": "Request body for POST /v1/job-search/run (canonical)."
+        "description": "Request body for POST run."
       },
       "RunScoreResponse": {
         "properties": {
@@ -1048,7 +1184,7 @@
           "errors"
         ],
         "title": "RunScoreResponse",
-        "description": "HTTP response body for POST /v1/job-search/run."
+        "description": "HTTP response body for POST run."
       },
       "RunValidateChecks": {
         "properties": {
@@ -1093,7 +1229,7 @@
           "all_records_schema_valid"
         ],
         "title": "RunValidateChecks",
-        "description": "Validation checks executed by dry-run validation for /v1/job-search/run."
+        "description": "Validation checks executed by dry-run validation for /run."
       },
       "RunValidateSummary": {
         "properties": {
@@ -1161,7 +1297,33 @@
           "checks"
         ],
         "title": "RunValidateSummary",
-        "description": "Dry-run summary for validating whether /v1/job-search/run can execute."
+        "description": "Dry-run summary for validating whether /run can execute."
+      },
+      "TaskSummary": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "name"
+        ],
+        "title": "TaskSummary",
+        "description": "Summary item from GET /v1/tasks."
       },
       "ValidationError": {
         "properties": {
