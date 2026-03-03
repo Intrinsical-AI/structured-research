@@ -7,15 +7,15 @@ import re
 from dataclasses import dataclass
 
 from structured_search.domain.atoms import ClaimAtom, ContextAtom
-from structured_search.ports.grounding import GroundingPort
-from structured_search.ports.llm import LLMPort
-from structured_search.ports.prompting import PromptComposerPort
-from structured_search.tasks.gen_cv.models import (
+from structured_search.domain.gen_cv.models import (
     CandidateAtomsProfile,
     CVOutput,
     GeneratedCV,
     JobDescription,
 )
+from structured_search.ports.grounding import GroundingPort
+from structured_search.ports.llm import LLMPort
+from structured_search.ports.prompting import PromptComposerPort
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +32,7 @@ class PromptArtifacts:
 
 
 class GenCVService:
-    """Generate a tailored CV using LLM + grounded claims.
-
-    Flow:
-      1. Load domain contexts → rank by relevance to job (stack term overlap)
-      2. For top-k contexts: load their claims + resolve evidence URLs
-      3. Build structured prompt: identity (via PromptComposer or fallback) +
-         job details + grounded facts with evidence
-      4. Call LLM.extract_json(prompt, CVOutput) → Pydantic-validated output
-      5. Return GeneratedCV tracking cited claim IDs
-    """
+    """Generate a tailored CV using LLM + grounded claims."""
 
     def __init__(
         self,
@@ -50,14 +41,6 @@ class GenCVService:
         domain: str = "job_search",
         prompt_composer: PromptComposerPort | None = None,
     ):
-        """Wire up LLM, grounding adapter, and prompt composer.
-
-        Args:
-            llm: LLM adapter (OllamaLLM or MockLLM).
-            grounding: Atoms grounding adapter.
-            domain: Domain key used when loading context atoms (default "job_search").
-            prompt_composer: Port used to load base prompt sections.
-        """
         self.llm = llm
         self.grounding = grounding
         self.domain = domain
@@ -85,7 +68,6 @@ class GenCVService:
         )
         output = CVOutput.model_validate(self.llm.extract_json(prompt, CVOutput))
 
-        # Filter to only claim IDs that actually exist in our grounding set
         grounded = [cid for cid in output.cited_claim_ids if cid in all_claim_ids]
 
         return GeneratedCV(
@@ -107,7 +89,6 @@ class GenCVService:
         candidate: CandidateAtomsProfile,
         allowed_claim_ids: list[str] | None = None,
     ) -> PromptArtifacts:
-        """Render the full GEN_CV prompt (including grounded facts) without calling the LLM."""
         allowed_claim_ids_set = set(allowed_claim_ids) if allowed_claim_ids is not None else None
         ranked, claims_by_ctx, _ = self._select_grounded_claims(job, allowed_claim_ids_set)
         base_prompt = self._resolve_identity_prompt()
@@ -145,7 +126,6 @@ class GenCVService:
 
     @staticmethod
     def _rank_contexts(contexts: list[ContextAtom], job: JobDescription) -> list[ContextAtom]:
-        """Rank contexts by relevance to the job via stack term overlap."""
         job_terms = {t.lower() for t in job.stack}
         if not job_terms:
             return contexts
@@ -170,11 +150,6 @@ class GenCVService:
         allowed_claim_ids: set[str] | None = None,
         identity: str | None = None,
     ) -> str:
-        """Assemble the structured prompt sent to the LLM.
-
-        Combines identity section (from PromptComposer or fallback), job details,
-        candidate overview, and grounded facts with claim IDs for citation.
-        """
         resolved_identity = identity if identity is not None else self._resolve_identity_prompt()
 
         stack_str = ", ".join(job.stack) if job.stack else "not specified"
@@ -257,7 +232,6 @@ class GenCVService:
         return "\n".join(lines)
 
     def _resolve_evidence_url(self, claim: ClaimAtom) -> str | None:
-        """Return the first resolvable evidence URL for a claim."""
         for eid in claim.evidence_ids:
             atom = self.grounding.get_evidence(eid)
             if atom is not None:

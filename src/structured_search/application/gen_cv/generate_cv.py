@@ -12,16 +12,16 @@ from structured_search.application.common.dependencies import (
     ApplicationDependencies,
     resolve_dependencies,
 )
+from structured_search.application.gen_cv.service import GenCVService
 from structured_search.contracts import CvCandidateInput, GenCVResponse
-from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, OllamaLLM
-from structured_search.ports.grounding import GroundingPort
-from structured_search.tasks.gen_cv.models import (
+from structured_search.domain.gen_cv.models import (
     CandidateAtomsProfile,
     GeneratedCV,
     JobDescription,
 )
-from structured_search.tasks.gen_cv.service import GenCVService
+from structured_search.infra.grounding import AtomsGrounding
+from structured_search.infra.llm import MockLLM, OllamaLLM
+from structured_search.ports.grounding import GroundingPort
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +195,7 @@ def _build_mock_cv_llm(
 
 def gen_cv(
     *,
+    task_id: str = "gen_cv",
     profile_id: str,
     job: dict[str, Any],
     candidate_profile: CvCandidateInput | dict[str, Any],
@@ -211,7 +212,7 @@ def gen_cv(
     ollama_llm_cls = ollama_llm_cls or OllamaLLM
     mock_llm_cls = mock_llm_cls or MockLLM
     gen_cv_service_cls = gen_cv_service_cls or GenCVService
-    bundle = resolved.profile_repo.load_bundle(profile_id)
+    bundle = resolved.profile_repo.load_bundle(task_id, profile_id)
 
     job_model = _job_input_to_description(job)
     candidate_input = (
@@ -221,7 +222,7 @@ def gen_cv(
     )
     candidate_model = _candidate_input_to_profile(profile_id, candidate_input)
 
-    atoms_dir = resolved.profile_repo.atoms_dir(profile_id)
+    atoms_dir = resolved.profile_repo.atoms_dir(task_id, profile_id)
     grounding: GroundingPort = (
         AtomsGrounding(atoms_dir=str(atoms_dir)) if atoms_dir.is_dir() else _EmptyGrounding()
     )

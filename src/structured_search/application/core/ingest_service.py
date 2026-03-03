@@ -1,19 +1,22 @@
-"""Application use-case for tolerant JSONL parsing + schema validation."""
+"""Generic tolerant JSONL ingest + schema validation for task plugins."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
+from structured_search.application.common.validation_messages import format_schema_validation_error
 from structured_search.contracts import IngestError, IngestResult, IngestStats
 from structured_search.infra.loading import TolerantJSONLParser
-from structured_search.tasks.job_search.models import JobPosting
 
 
-def ingest_validate_jsonl(raw_text: str) -> IngestResult:
-    """Parse JSONL tolerantly then validate each record against JobPosting."""
+def ingest_validate_jsonl(
+    *,
+    raw_text: str,
+    record_model: type[BaseModel],
+) -> IngestResult:
     parser = TolerantJSONLParser()
     parsed_valid, parse_errors = parser.parse_with_lines(raw_text)
 
@@ -29,11 +32,10 @@ def ingest_validate_jsonl(raw_text: str) -> IngestResult:
 
     valid_records: list[dict[str, Any]] = []
     schema_error_count = 0
-
     for parsed in parsed_valid:
         raw = parsed.record
         try:
-            JobPosting.model_validate(raw)
+            record_model.model_validate(raw)
             valid_records.append(raw)
         except ValidationError as exc:
             schema_error_count += 1
@@ -42,7 +44,7 @@ def ingest_validate_jsonl(raw_text: str) -> IngestResult:
                     line_no=parsed.line_no,
                     raw_preview=json.dumps(raw, ensure_ascii=False)[:200],
                     kind="schema_validation",
-                    message=exc.errors(include_url=False).__str__(),
+                    message=format_schema_validation_error(exc),
                 )
             )
 

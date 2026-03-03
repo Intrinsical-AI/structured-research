@@ -1,30 +1,24 @@
-"""Application use-cases for profile discovery and bundle persistence."""
+"""Generic profile bundle use-cases parameterized by task plugins."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from structured_search.application.common.dependencies import (
     ApplicationDependencies,
     resolve_dependencies,
 )
-from structured_search.contracts import (
-    BundleSaveResponse,
-    ProfileBundle,
-    ValidationIssue,
-)
-from structured_search.infra.config_loader import TaskRuntimeConfig, collect_model_field_paths
+from structured_search.application.core.task_plugin import TaskPlugin
+from structured_search.contracts import BundleSaveResponse, ProfileBundle, ValidationIssue
+from structured_search.infra.config_loader import collect_model_field_paths
 from structured_search.ports.persistence import BundleData
-from structured_search.tasks.job_search.models import JobPosting, JobSearchConstraints
-
-# Computed once from JobPosting and reused for cross-field warnings.
-POSTING_VALID_PATHS: frozenset[str] = collect_model_field_paths(JobPosting)
 
 
-def bundle_from_data(profile_id: str, data: BundleData) -> ProfileBundle:
+def bundle_from_data(task_id: str, profile_id: str, data: BundleData) -> ProfileBundle:
     return ProfileBundle(
+        task_id=task_id,
         profile_id=profile_id,
         constraints=data.constraints,
         task=data.task,
@@ -57,11 +51,13 @@ def extract_profile_name(profile_id: str, user_profile: dict[str, Any] | None) -
     return profile_id
 
 
-def list_profiles(deps: ApplicationDependencies | None = None) -> list[dict[str, str]]:
-    """Discover available profile IDs under config/job_search."""
+def list_profiles(
+    task_id: str,
+    deps: ApplicationDependencies | None = None,
+) -> list[dict[str, str]]:
     resolved = resolve_dependencies(deps)
     result: list[dict[str, str]] = []
-    for profile in resolved.profile_repo.list_profiles():
+    for profile in resolved.profile_repo.list_profiles(task_id):
         result.append(
             {
                 "id": profile.id,
@@ -73,13 +69,13 @@ def list_profiles(deps: ApplicationDependencies | None = None) -> list[dict[str,
 
 
 def load_bundle(
+    task_id: str,
     profile_id: str,
     deps: ApplicationDependencies | None = None,
 ) -> ProfileBundle:
-    """Read constraints, task and task_config from profile bundle.json."""
     resolved = resolve_dependencies(deps)
-    data = resolved.profile_repo.load_bundle(profile_id)
-    return bundle_from_data(profile_id, data)
+    data = resolved.profile_repo.load_bundle(task_id, profile_id)
+    return bundle_from_data(task_id, profile_id, data)
 
 
 def _append_validation_errors(
@@ -101,19 +97,30 @@ def _append_validation_errors(
         )
 
 
-def _validate_constraints(bundle: ProfileBundle, issues: list[ValidationIssue]) -> None:
+def _validate_payload_type(
+    *,
+    model_cls: type[BaseModel] | None,
+    value: dict[str, Any],
+    prefix: str,
+    issues: list[ValidationIssue],
+) -> None:
+    if model_cls is None:
+        return
     try:
-        JobSearchConstraints.model_validate(bundle.constraints)
+        model_cls.model_validate(value)
     except ValidationError as exc:
-        _append_validation_errors(issues, prefix="constraints", exc=exc)
+        _append_validation_errors(issues, prefix=prefix, exc=exc)
 
 
-def _validate_task_sections(bundle: ProfileBundle, issues: list[ValidationIssue]) -> bool:
-    has_required_sections = True
+def _validate_task_runtime(
+    bundle: ProfileBundle, plugin: TaskPlugin, issues: list[ValidationIssue]
+) -> None:
+    if not plugin.validate_task_runtime:
+        return
+
     for required_key in ("gates", "soft_scoring"):
         if required_key in bundle.task:
             continue
-        has_required_sections = False
         issues.append(
             ValidationIssue(
                 path=f"task.{required_key}",
@@ -122,27 +129,13 @@ def _validate_task_sections(bundle: ProfileBundle, issues: list[ValidationIssue]
                 severity="error",
             )
         )
-    return has_required_sections
 
-
-def _validate_task_config_type(bundle: ProfileBundle, issues: list[ValidationIssue]) -> None:
-    if isinstance(bundle.task_config, dict):
-        return
-    issues.append(
-        ValidationIssue(
-            path="task_config",
-            code="invalid_type",
-            message="task_config must be a JSON object",
-            severity="error",
-        )
+    _validate_payload_type(
+        model_cls=plugin.task_runtime_model,
+        value=bundle.task,
+        prefix="task",
+        issues=issues,
     )
-
-
-def _validate_task_runtime(bundle: ProfileBundle, issues: list[ValidationIssue]) -> None:
-    try:
-        TaskRuntimeConfig.model_validate(bundle.task)
-    except ValidationError as exc:
-        _append_validation_errors(issues, prefix="task", exc=exc)
 
 
 def _append_unknown_field_warnings(
@@ -151,40 +144,51 @@ def _append_unknown_field_warnings(
     rules: list[Any],
     path_prefix: str,
     message_suffix: str,
+    valid_paths: frozenset[str],
 ) -> None:
     for idx, rule in enumerate(rules):
         field_path: str = rule.get("field", "") if isinstance(rule, dict) else ""
-        if field_path and field_path not in POSTING_VALID_PATHS:
+        if field_path and field_path not in valid_paths:
             issues.append(
                 ValidationIssue(
                     path=f"{path_prefix}[{idx}].field",
                     code="unknown_field_path",
                     message=(
-                        f"'{field_path}' is not a declared field on JobPosting — {message_suffix}"
+                        f"'{field_path}' is not a declared field on record model — {message_suffix}"
                     ),
                     severity="warning",
                 )
             )
 
 
-def _append_rule_warnings(bundle: ProfileBundle, issues: list[ValidationIssue]) -> None:
+def _append_rule_warnings(
+    bundle: ProfileBundle, plugin: TaskPlugin, issues: list[ValidationIssue]
+) -> None:
+    record_model = plugin.record_model
+    if record_model is None:
+        return
+    valid_paths = collect_model_field_paths(record_model)
+
     _append_unknown_field_warnings(
         issues,
         rules=bundle.constraints.get("must", []),
         path_prefix="constraints.must",
         message_suffix="the scorer will score 0 for this rule",
+        valid_paths=valid_paths,
     )
     _append_unknown_field_warnings(
         issues,
         rules=bundle.constraints.get("prefer", []),
         path_prefix="constraints.prefer",
         message_suffix="the scorer will score 0 for this rule",
+        valid_paths=valid_paths,
     )
     _append_unknown_field_warnings(
         issues,
         rules=bundle.constraints.get("avoid", []),
         path_prefix="constraints.avoid",
         message_suffix="the scorer will score 0 for this rule",
+        valid_paths=valid_paths,
     )
     hard_filters = (
         bundle.task.get("gates", {}).get("hard_filters", [])
@@ -196,26 +200,46 @@ def _append_rule_warnings(bundle: ProfileBundle, issues: list[ValidationIssue]) 
         rules=hard_filters if isinstance(hard_filters, list) else [],
         path_prefix="task.gates.hard_filters",
         message_suffix="this hard filter may never match and can distort gating",
+        valid_paths=valid_paths,
     )
 
 
 def save_bundle(
+    task_id: str,
+    profile_id: str,
     bundle: ProfileBundle,
+    plugin: TaskPlugin,
     deps: ApplicationDependencies | None = None,
 ) -> BundleSaveResponse:
-    """Validate and persist a ProfileBundle to disk with warning/error split."""
     issues: list[ValidationIssue] = []
-    _validate_constraints(bundle, issues)
-    task_has_required_sections = _validate_task_sections(bundle, issues)
-    _validate_task_config_type(bundle, issues)
-    if task_has_required_sections:
-        _validate_task_runtime(bundle, issues)
+
+    bundle.task_id = task_id
+    bundle.profile_id = profile_id
+
+    _validate_payload_type(
+        model_cls=plugin.constraints_model,
+        value=bundle.constraints,
+        prefix="constraints",
+        issues=issues,
+    )
+
+    if not isinstance(bundle.task_config, dict):
+        issues.append(
+            ValidationIssue(
+                path="task_config",
+                code="invalid_type",
+                message="task_config must be a JSON object",
+                severity="error",
+            )
+        )
+
+    _validate_task_runtime(bundle, plugin, issues)
 
     if any(i.severity == "error" for i in issues):
         return BundleSaveResponse(valid=False, issues=issues)
-    _append_rule_warnings(bundle, issues)
+
+    _append_rule_warnings(bundle, plugin, issues)
 
     resolved = resolve_dependencies(deps)
-    resolved.profile_repo.save_bundle(bundle.profile_id, bundle_to_data(bundle))
-
+    resolved.profile_repo.save_bundle(task_id, profile_id, bundle_to_data(bundle))
     return BundleSaveResponse(valid=True, issues=issues)

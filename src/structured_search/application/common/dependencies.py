@@ -15,7 +15,7 @@ from structured_search.infra.prompts import PromptComposer
 from structured_search.ports.persistence import ProfileRepository, RunRepository
 from structured_search.ports.prompting import PromptComposerPort
 
-DEFAULT_PROFILES_BASE = Path(os.getenv("PROFILES_BASE", "config/job_search"))
+DEFAULT_PROFILES_BASE = Path(os.getenv("PROFILES_BASE", "config"))
 DEFAULT_PROMPTS_DIR = Path("resources/prompts")
 DEFAULT_RUNS_DIR = Path("runs")
 

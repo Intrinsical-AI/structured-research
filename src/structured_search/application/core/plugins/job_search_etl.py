@@ -1,14 +1,14 @@
-"""Job search ETL service."""
+"""Job-search ETL service kept under application plugin support modules."""
 
 from __future__ import annotations
 
-from structured_search.domain.scoring import ScoredResult
-from structured_search.ports.etl import BaseETLService
-from structured_search.tasks.job_search.models import (
+from structured_search.domain.job_search.models import (
     JobPosting,
     JobSearchConstraints,
     ScoredJobPosting,
 )
+from structured_search.domain.scoring import ScoredResult
+from structured_search.ports.etl import BaseETLService
 
 
 class ETLJobSearch(BaseETLService[JobSearchConstraints, JobPosting, ScoredJobPosting]):

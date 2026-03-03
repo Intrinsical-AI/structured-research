@@ -1,4 +1,4 @@
-"""Application use-case for deterministic scoring and snapshot persistence."""
+"""Generic deterministic scoring + snapshot persistence for task plugins."""
 
 from __future__ import annotations
 
@@ -17,54 +17,87 @@ from structured_search.application.common.dependencies import (
     resolve_dependencies,
 )
 from structured_search.application.common.errors import SnapshotPersistenceError
-from structured_search.application.job_search.profiles import bundle_to_data, load_bundle
+from structured_search.application.common.validation_messages import format_schema_validation_error
+from structured_search.application.core.bundle_service import bundle_to_data, load_bundle
+from structured_search.application.core.task_plugin import TaskPlugin
 from structured_search.contracts import (
     IngestError,
-    ProfileBundle,
     RunScoreRequest,
     RunSummary,
     RunValidateChecks,
     RunValidateSummary,
 )
-from structured_search.infra.config_loader import task_json_to_scoring_config
-from structured_search.infra.scoring import HeuristicScorer
-from structured_search.tasks.job_search.models import JobPosting, JobSearchConstraints
 
 logger = logging.getLogger(__name__)
 
 
-def _make_run_id(profile_id: str) -> str:
+def _make_run_id(task_id: str, profile_id: str) -> str:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     short = uuid.uuid4().hex[:6]
-    return f"{profile_id}-{ts}-{short}"
+    return f"{task_id}-{profile_id}-{ts}-{short}"
+
+
+def _require_plugin_runtime(plugin: TaskPlugin) -> None:
+    if plugin.build_runtime is None or plugin.record_model is None:
+        raise ValueError(f"Task {plugin.task_id!r} does not support scoring runtime")
+
+
+def _validate_records(
+    records: list[dict[str, Any]],
+    *,
+    record_model,
+) -> tuple[list[Any], list[IngestError]]:
+    valid: list[Any] = []
+    schema_errors: list[IngestError] = []
+    for idx, raw in enumerate(records, start=1):
+        try:
+            posting = record_model.model_validate(raw)
+        except ValidationError as exc:
+            schema_errors.append(
+                IngestError(
+                    line_no=idx,
+                    raw_preview=json.dumps(raw, ensure_ascii=False)[:200],
+                    kind="schema_validation",
+                    message=format_schema_validation_error(exc),
+                )
+            )
+            continue
+        valid.append(posting)
+    return valid, schema_errors
 
 
 def run_score(
+    *,
+    task_id: str,
     request: RunScoreRequest,
+    plugin: TaskPlugin,
     deps: ApplicationDependencies | None = None,
 ) -> RunSummary:
-    """Validate records, score them and write run snapshot metadata."""
+    _require_plugin_runtime(plugin)
+
     resolved = resolve_dependencies(deps)
-    bundle = load_bundle(request.profile_id, deps=resolved)
-    constraints, scorer = _build_scorer_components(bundle)
-    valid_postings, schema_errors = _validate_records(request.records)
+    bundle = load_bundle(task_id=task_id, profile_id=request.profile_id, deps=resolved)
+    constraints, scorer = plugin.build_runtime(bundle.constraints, bundle.task)  # type: ignore[misc]
+    valid_records, schema_errors = _validate_records(
+        request.records,
+        record_model=plugin.record_model,  # type: ignore[arg-type]
+    )
 
     skipped = len(schema_errors)
     scored_records: list[dict[str, Any]] = []
     gate_passed = 0
     gate_failed = 0
 
-    for posting in valid_postings:
-        scored = scorer.score(posting, constraints)
+    for record in valid_records:
+        scored = scorer.score(record, constraints)
         scored_dict = scored.model_dump(mode="json")
         scored_records.append(scored_dict)
-
         if scored.gate_passed:
             gate_passed += 1
         else:
             gate_failed += 1
 
-    run_id = _make_run_id(request.profile_id)
+    run_id = _make_run_id(task_id=task_id, profile_id=request.profile_id)
     snapshot = resolved.run_repo.save_snapshot(
         run_id=run_id,
         bundle=bundle_to_data(bundle),
@@ -72,6 +105,7 @@ def run_score(
         output_records=scored_records,
         meta={
             "run_id": run_id,
+            "task_id": task_id,
             "profile_id": request.profile_id,
             "total": len(request.records),
             "gate_passed": gate_passed,
@@ -79,6 +113,7 @@ def run_score(
             "skipped": skipped,
         },
     )
+
     if snapshot.status == "failed":
         logger.warning(
             "Could not write run snapshot to %s: %s",
@@ -106,16 +141,25 @@ def run_score(
 
 
 def validate_run(
+    *,
+    task_id: str,
     request: RunScoreRequest,
+    plugin: TaskPlugin,
     deps: ApplicationDependencies | None = None,
 ) -> RunValidateSummary:
-    """Dry-run validation for /run without real scoring execution."""
+    _require_plugin_runtime(plugin)
+
     resolved = resolve_dependencies(deps)
-    bundle = load_bundle(request.profile_id, deps=resolved)
-    _build_scorer_components(bundle)
-    valid_postings, schema_errors = _validate_records(request.records)
+    bundle = load_bundle(task_id=task_id, profile_id=request.profile_id, deps=resolved)
+    plugin.build_runtime(bundle.constraints, bundle.task)  # type: ignore[misc]
+    valid_records, schema_errors = _validate_records(
+        request.records,
+        record_model=plugin.record_model,  # type: ignore[arg-type]
+    )
+
     snapshot_probe = _probe_snapshot_io(
         resolved=resolved,
+        task_id=task_id,
         profile_id=request.profile_id,
         bundle=bundle,
         input_records=request.records,
@@ -127,7 +171,7 @@ def validate_run(
         ok=can_run,
         profile_id=request.profile_id,
         total_records=len(request.records),
-        valid_records=len(valid_postings),
+        valid_records=len(valid_records),
         invalid_records=len(schema_errors),
         errors=schema_errors,
         checks=RunValidateChecks(
@@ -143,46 +187,15 @@ def validate_run(
     )
 
 
-def _build_scorer_components(
-    bundle: ProfileBundle,
-) -> tuple[JobSearchConstraints, HeuristicScorer]:
-    """Build scoring constraints and scorer from a profile bundle."""
-    constraints = JobSearchConstraints.model_validate(bundle.constraints)
-    scoring_config = task_json_to_scoring_config(bundle.task)
-    scorer = HeuristicScorer(config=scoring_config)
-    return constraints, scorer
-
-
-def _validate_records(records: list[dict[str, Any]]) -> tuple[list[JobPosting], list[IngestError]]:
-    """Validate request records against JobPosting schema."""
-    valid_postings: list[JobPosting] = []
-    schema_errors: list[IngestError] = []
-    for idx, raw in enumerate(records, start=1):
-        try:
-            posting = JobPosting.model_validate(raw)
-        except ValidationError as exc:
-            schema_errors.append(
-                IngestError(
-                    line_no=idx,
-                    raw_preview=json.dumps(raw, ensure_ascii=False)[:200],
-                    kind="schema_validation",
-                    message=exc.errors(include_url=False).__str__(),
-                )
-            )
-            continue
-        valid_postings.append(posting)
-    return valid_postings, schema_errors
-
-
 def _probe_snapshot_io(
     *,
     resolved: ApplicationDependencies,
+    task_id: str,
     profile_id: str,
-    bundle: ProfileBundle,
+    bundle,
     input_records: list[dict[str, Any]],
 ):
-    """Perform a lightweight snapshot write/delete probe used by dry-run validation."""
-    run_id = f"_validate-{profile_id}-{uuid.uuid4().hex[:8]}"
+    run_id = f"_validate-{task_id}-{profile_id}-{uuid.uuid4().hex[:8]}"
     probe = resolved.run_repo.save_snapshot(
         run_id=run_id,
         bundle=bundle_to_data(bundle),
@@ -190,6 +203,7 @@ def _probe_snapshot_io(
         output_records=[],
         meta={
             "run_id": run_id,
+            "task_id": task_id,
             "profile_id": profile_id,
             "probe": True,
         },

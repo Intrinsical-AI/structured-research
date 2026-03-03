@@ -1,4 +1,4 @@
-"""Input sanitization helpers for job-search JSONL ETL runs."""
+"""Input sanitization helpers for job-search JSONL runs."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class SanitizeSummary:
 
 
 def sanitize_jsonl_for_run(input_path: Path | str) -> SanitizeSummary:
-    """Sanitize a JSONL file for `job-search run`.
+    """Sanitize a JSONL file for task run input.
 
     Behavior:
     - Applies best-effort fixes only to parseable JSON-object lines.
