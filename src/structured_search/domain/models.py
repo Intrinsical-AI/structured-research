@@ -2,7 +2,7 @@
 
 This module defines the core abstractions: constraints, evidence, results.
 Scoring configuration is separated to infra/scoring_config.py.
-Task-specific models go in tasks/<name>/models.py.
+Task-specific models go in domain/<task>/models.py.
 """
 
 from __future__ import annotations
