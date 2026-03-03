@@ -20,9 +20,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="API base URL (with or without /v1)",
     )
     parser.add_argument(
+        "--task-id",
+        default="job_search",
+        help="task_id path segment for /tasks/{task_id}/jsonl/validate",
+    )
+    parser.add_argument(
         "--profile-id",
-        default="profile_1",
-        help="profile_id sent to /job-search/jsonl/validate",
+        default="profile_example",
+        help="profile_id sent to /tasks/{task_id}/jsonl/validate",
     )
     parser.add_argument(
         "--input",
@@ -68,11 +73,12 @@ def collect_input_files(inputs: list[str], glob_pattern: str, max_files: int) ->
 def call_validate_endpoint(
     *,
     api_base: str,
+    task_id: str,
     profile_id: str,
     raw_jsonl: str,
     timeout: float,
 ) -> dict[str, Any]:
-    url = f"{normalize_api_base(api_base)}/job-search/jsonl/validate"
+    url = f"{normalize_api_base(api_base)}/tasks/{task_id}/jsonl/validate"
     payload = {"profile_id": profile_id, "raw_jsonl": raw_jsonl}
     req = urllib_request.Request(
         url,
@@ -105,13 +111,18 @@ def main(argv: list[str] | None = None) -> int:
     total_lines = 0
     total_invalid = 0
 
-    print(f"Using endpoint: {normalize_api_base(args.api_base)}/job-search/jsonl/validate")
-    print(f"Processing {len(files)} file(s) with profile_id={args.profile_id}")
+    print(
+        f"Using endpoint: {normalize_api_base(args.api_base)}/tasks/{args.task_id}/jsonl/validate"
+    )
+    print(
+        f"Processing {len(files)} file(s) with task_id={args.task_id} profile_id={args.profile_id}"
+    )
 
     for file_path in files:
         raw_jsonl = file_path.read_text(encoding="utf-8")
         response = call_validate_endpoint(
             api_base=args.api_base,
+            task_id=args.task_id,
             profile_id=args.profile_id,
             raw_jsonl=raw_jsonl,
             timeout=args.timeout,

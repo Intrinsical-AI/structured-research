@@ -413,17 +413,17 @@ def parse_args(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate atoms dataset integrity")
     parser.add_argument(
         "--atoms-dir",
-        default="config/job_search/profile_1/atoms",
+        default="config/job_search/profile_example/atoms",
         help="Atoms root directory",
     )
     parser.add_argument(
         "--schemas-dir",
-        default="config/job_search/profile_1/atoms/schemas",
+        default="config/job_search/profile_example/atoms/schemas",
         help="Directory with atom schemas in YAML format",
     )
     parser.add_argument(
         "--canon-tags",
-        default="config/job_search/profile_1/atoms/canon_tags.yaml",
+        default="config/job_search/profile_example/atoms/canon_tags.yaml",
         help="Canonical tags file",
     )
     return parser.parse_args(list(argv))

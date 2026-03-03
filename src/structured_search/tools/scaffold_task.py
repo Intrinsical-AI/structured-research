@@ -59,6 +59,7 @@ def scaffold_task(task_name: str) -> int:
     config_dir.mkdir(parents=True, exist_ok=True)
 
     bundle = {
+        "task_id": task_name,
         "profile_id": "profile_default",
         "constraints": {
             "domain": task_name,
@@ -71,8 +72,7 @@ def scaffold_task(task_name: str) -> int:
         },
         "task": {
             "gates": {
-                "must_pass_constraints_must": True,
-                "hard_filters_mode": "any",
+                "hard_filters_mode": "require_all",
                 "hard_filters": [],
                 "reject_anomalies": [],
                 "required_evidence_fields": [],
@@ -149,8 +149,8 @@ def scaffold_task(task_name: str) -> int:
     print(f"  1. Edit resources/prompts/{task_name}/context.md")
     print(f"  2. Edit resources/prompts/{task_name}/steps/*.md")
     print(f"  3. Edit config/{task_name}/profile_default/bundle.json")
-    print(f"  4. Create models in src/structured_search/tasks/{task_name}/models.py")
-    print(f"  5. Create service in src/structured_search/tasks/{task_name}/service.py")
+    print(f"  4. Create models in src/structured_search/domain/{task_name}/models.py")
+    print("  5. Register plugin in src/structured_search/application/core/plugins/")
 
     return 0
 

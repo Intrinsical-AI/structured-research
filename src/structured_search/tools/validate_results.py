@@ -26,7 +26,7 @@ def validate_results(
     Args:
         input_dir: Input directory with raw results
         output_dir: Output directory for validated results
-        task: Task name (job_search, gen_cv)
+        task: Task name (job_search, gen_cv, product_search)
         strict: If True, fail on first error; else collect all
 
     Returns:
@@ -47,7 +47,7 @@ def validate_results(
 
     model = _select_model(task)
     if model is None:
-        logger.error(f"Unknown task: {task}. Supported: job_search, gen_cv")
+        logger.error(f"Unknown task: {task}. Supported: job_search, gen_cv, product_search")
         return 1
 
     valid_count = 0
@@ -106,13 +106,17 @@ def validate_results(
 
 def _select_model(task: str):
     if task == "job_search":
-        from structured_search.tasks.job_search.models import JobPosting
+        from structured_search.domain.job_search.models import JobPosting
 
         return JobPosting
     if task == "gen_cv":
-        from structured_search.tasks.gen_cv.models import JobDescription
+        from structured_search.domain.gen_cv.models import JobDescription
 
         return JobDescription
+    if task == "product_search":
+        from structured_search.domain.product_search.models import ProductRecord
+
+        return ProductRecord
     return None
 
 
@@ -239,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--task",
         default="job_search",
-        help="Task name (job_search, gen_cv)",
+        help="Task name (job_search, gen_cv, product_search)",
     )
     parser.add_argument(
         "--strict",

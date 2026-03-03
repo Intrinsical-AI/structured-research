@@ -1,4 +1,4 @@
-"""Extract clean JobDescription JSON files from the malformed profile_1 result.jsonl.
+"""Extract clean JobDescription JSON files from the malformed profile_example result.jsonl.
 
 The raw JSONL has two structural issues produced by the LLM:
   1. Evidence sub-objects (e2, e3 …) emitted as separate lines instead of being
@@ -14,11 +14,11 @@ This script:
   - Overrides seniority "mid" → "junior" for postings with trainee/prácticas signals
      (these were mis-mapped before Fix 1 corrected SeniorityInfo.level)
   - Writes one JobDescription-compatible JSON per posting to --output-dir
-    (default: results/job_search/profile_1/postings/)
+    (default: results/job_search/profile_example/postings/)
 
 Usage:
   uv run structured-search tools extract-p2-postings
-  uv run structured-search tools extract-p2-postings --input results/job_search/profile_1/result.jsonl
+  uv run structured-search tools extract-p2-postings --input results/job_search/profile_example/result.jsonl
 """
 
 import argparse
@@ -158,32 +158,40 @@ def extract(input_path: Path, output_dir: Path) -> int:
     print(f"  Errors    : {parse_errors} unparseable lines")
     print()
     print("Next steps:")
-    print("  1. Fill in config/job_search/profile_1/candidate.json with real candidate data")
-    print("  2. Run gen_cv for each posting:")
+    print("  1. Fill in config/job_search/profile_example/candidate.json with real candidate data")
+    print("  2. Build a gen_cv request per posting and execute task action:")
     print(f"     for f in {output_dir}/*.json; do")
-    print("       uv run structured-search gen-cv run \\")
-    print('         --job "$f" \\')
-    print("         --candidate config/job_search/profile_1/candidate.json \\")
-    print("         --profile profile_1 \\")
-    print("         --llm-model <your-model> \\")
-    print("         --output results/gen_cv/profile_1/$(basename $f)")
+    print("       python3 - <<'PY' \"$f\" > /tmp/gen_cv_request.json")
+    print("import json,sys")
+    print("job=json.load(open(sys.argv[1], encoding='utf-8'))")
+    print(
+        "candidate=json.load(open('config/job_search/profile_example/candidate.json', encoding='utf-8'))"
+    )
+    print(
+        "json.dump({'profile_id':'profile_example','job':job,'candidate_profile':candidate}, sys.stdout)"
+    )
+    print("PY")
+    print(
+        "       uv run structured-search task gen_cv action --name gen-cv --request /tmp/gen_cv_request.json \\"
+    )
+    print("         > results/gen_cv/profile_example/$(basename $f)")
     print("     done")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Extract clean JobDescription JSON files from a malformed profile_1 result.jsonl"
+        description="Extract clean JobDescription JSON files from a malformed profile_example result.jsonl"
     )
     parser.add_argument(
         "--input",
-        default="results/job_search/profile_1/result.jsonl",
-        help="Path to raw result.jsonl (default: results/job_search/profile_1/result.jsonl)",
+        default="results/job_search/profile_example/result.jsonl",
+        help="Path to raw result.jsonl (default: results/job_search/profile_example/result.jsonl)",
     )
     parser.add_argument(
         "--output-dir",
-        default="results/job_search/profile_1/postings",
-        help="Output directory for extracted posting JSONs (default: results/job_search/profile_1/postings/)",
+        default="results/job_search/profile_example/postings",
+        help="Output directory for extracted posting JSONs (default: results/job_search/profile_example/postings/)",
     )
     args = parser.parse_args(argv)
 
