@@ -88,6 +88,7 @@ export type JsonlValidateResponse = {
 }
 
 export type ProfileBundle = {
+  "task_id"?: string;
   "profile_id": string;
   "constraints": Record<string, unknown>;
   "task": Record<string, unknown>;
@@ -120,6 +121,9 @@ export type RunResponseMetrics = {
   "loaded": number;
   "processed": number;
   "skipped": number;
+  "gate_passed": number;
+  "gate_failed": number;
+  "gate_pass_rate": number;
   "started_at": string;
   "finished_at": string;
 }
@@ -160,6 +164,12 @@ export type RunValidateSummary = {
   "checks": RunValidateChecks;
   "snapshot_probe_dir"?: string | null;
   "snapshot_probe_error"?: string | null;
+}
+
+export type TaskSummary = {
+  "task_id": string;
+  "name": string;
+  "capabilities"?: string[];
 }
 
 export type ValidationError = {

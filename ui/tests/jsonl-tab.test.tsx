@@ -34,7 +34,7 @@ vi.mock("@/lib/api-client", () => ({
 describe("JsonlTab critical flow", () => {
   beforeEach(() => {
     workspace = createWorkspaceMock({
-      activeProfileId: "profile_1",
+      activeProfileId: "profile_example",
       jsonlStatus: "draft",
       jsonlRaw: "",
       jsonl: null,
@@ -69,7 +69,7 @@ describe("JsonlTab critical flow", () => {
     await userEvent.click(screen.getByRole("button", { name: "Validar" }))
 
     await waitFor(() => {
-      expect(hoisted.apiMock.validateJsonl).toHaveBeenCalledWith("profile_1", raw)
+      expect(hoisted.apiMock.validateJsonl).toHaveBeenCalledWith("profile_example", raw)
       expect(workspace.setJsonlStatus).toHaveBeenCalledWith("done")
       expect(workspace.setJsonl).toHaveBeenCalledTimes(1)
     })

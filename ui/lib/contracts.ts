@@ -18,6 +18,8 @@ export const FEATURE_FLAGS = {
   atoms_picker_enabled: false,
 } as const
 
+export const WORKSPACE_TASK_ID = "job_search" as const
+
 // ── Process Status ──
 export type ProcessStatus = "draft" | "valid" | "invalid" | "running" | "done" | "failed"
 

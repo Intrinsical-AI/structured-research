@@ -34,7 +34,7 @@ vi.mock("@/lib/api-client", () => ({
 describe("ResultsTab critical flow", () => {
   beforeEach(() => {
     workspace = createWorkspaceMock({
-      activeProfileId: "profile_1",
+      activeProfileId: "profile_example",
       jsonl: {
         valid_records: [
           { id: "job-1", company: "Acme", title: "Senior Engineer", modality: "remote" },
@@ -52,8 +52,8 @@ describe("ResultsTab critical flow", () => {
 
   it("executes run and renders score/gate results", async () => {
     hoisted.apiMock.executeRun.mockResolvedValue({
-      run_id: "profile_1-20260222-050500-a1b2c3",
-      profile_id: "profile_1",
+      run_id: "profile_example-20260222-050500-a1b2c3",
+      profile_id: "profile_example",
       scored_records: [
         {
           id: "job-1",
@@ -82,18 +82,21 @@ describe("ResultsTab critical flow", () => {
         loaded: 2,
         processed: 2,
         skipped: 0,
+        gate_passed: 1,
+        gate_failed: 1,
+        gate_pass_rate: 0.5,
         started_at: "2026-02-22T05:05:00.123456",
         finished_at: "2026-02-22T05:05:00.223456",
       },
       errors: [],
-      snapshot_dir: "runs/profile_1-20260222-050500-a1b2c3",
+      snapshot_dir: "runs/profile_example-20260222-050500-a1b2c3",
     })
 
     const { rerender } = render(<ResultsTab />)
     await userEvent.click(screen.getByRole("button", { name: /Ejecutar Scoring/i }))
 
     await waitFor(() => {
-      expect(hoisted.apiMock.executeRun).toHaveBeenCalledWith("profile_1", workspace.jsonl?.valid_records ?? [])
+      expect(hoisted.apiMock.executeRun).toHaveBeenCalledWith("profile_example", workspace.jsonl?.valid_records ?? [])
       expect(workspace.setRunStatus).toHaveBeenCalledWith("done")
       expect(workspace.setRun).toHaveBeenCalledTimes(1)
     })

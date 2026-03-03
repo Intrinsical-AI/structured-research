@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export async function POST(req: Request) {
   const { profile_id, step } = await req.json()
   const selectedStep = typeof step === "string" ? step : "S3_execute"
-  const selectedProfile = typeof profile_id === "string" ? profile_id : "profile_1"
+  const selectedProfile = typeof profile_id === "string" ? profile_id : "profile_example"
 
   const prompt = [
     `# Mock Prompt (${selectedStep})`,

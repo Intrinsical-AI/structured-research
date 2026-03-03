@@ -32,7 +32,7 @@ vi.mock("@/lib/api-client", () => ({
 }))
 
 const baseBundle = {
-  profile_id: "profile_1",
+  profile_id: "profile_example",
   user_profile: { role_focus: ["Senior Python Engineer"] },
   constraints: { domain: "job_search", must: [], prefer: [], avoid: [] },
   task: { gates: {}, soft_scoring: {} },
@@ -42,7 +42,7 @@ const baseBundle = {
 describe("ConfigTab critical flows", () => {
   beforeEach(() => {
     workspace = createWorkspaceMock({
-      activeProfileId: "profile_1",
+      activeProfileId: "profile_example",
       bundle: baseBundle,
       bundleStatus: "draft",
       bundleErrors: [],

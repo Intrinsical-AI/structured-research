@@ -5,7 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { useWorkspace } from "@/lib/store"
 import { API_RUNTIME, api } from "@/lib/api-client"
-import { FEATURE_FLAGS } from "@/lib/contracts"
+import { FEATURE_FLAGS, WORKSPACE_TASK_ID } from "@/lib/contracts"
 import type { Bundle, ProfileSummary } from "@/lib/contracts"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ProfileSelector } from "@/components/profile-selector"
@@ -139,7 +139,7 @@ export default function WorkspacePage() {
             {/* Right: api badge + profile selector */}
             <div className="ml-auto flex items-center gap-3">
               <span className="hidden text-[10px] font-mono text-muted-foreground/50 sm:block">
-                {API_RUNTIME.isMock ? "api: mock" : `api: ${API_RUNTIME.base}`}
+                {API_RUNTIME.isMock ? `api: mock (${WORKSPACE_TASK_ID})` : `api: ${API_RUNTIME.base} (${WORKSPACE_TASK_ID})`}
               </span>
               <div className="h-4 w-px bg-border-subtle hidden sm:block" />
               <ProfileSelector />

@@ -9,6 +9,7 @@ import {
   type PromptResponse,
   type RunRequest,
   type RunResponse,
+  WORKSPACE_TASK_ID,
 } from "@/lib/contracts"
 
 const RAW_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/mock/v1"
@@ -18,6 +19,11 @@ export const API_RUNTIME = {
   base: BASE,
   isMock: BASE.startsWith("/api/mock"),
 } as const
+
+function taskPath(taskId: string, suffix: string): string {
+  const clean = suffix.startsWith("/") ? suffix : `/${suffix}`
+  return `/tasks/${taskId}${clean}`
+}
 
 async function request(url: string, options?: RequestInit): Promise<unknown> {
   const res = await fetch(`${BASE}${url}`, {
@@ -31,10 +37,7 @@ async function request(url: string, options?: RequestInit): Promise<unknown> {
   return res.json()
 }
 
-function parseResponse<T>(
-  payload: unknown,
-  endpoint: string
-): T {
+function parseResponse<T>(payload: unknown, endpoint: string): T {
   if (payload === null || payload === undefined) {
     throw new Error(`Invalid API response for ${endpoint}: <root> (empty payload)`)
   }
@@ -43,15 +46,16 @@ function parseResponse<T>(
 
 export const api = {
   getProfiles: async (): Promise<ProfileSummary[]> => {
-    const payload = await request("/job-search/profiles")
+    const endpoint = taskPath(WORKSPACE_TASK_ID, "/profiles")
+    const payload = await request(endpoint)
     if (!Array.isArray(payload)) {
-      throw new Error("Invalid API response for /job-search/profiles: <root> (expected array)")
+      throw new Error(`Invalid API response for ${endpoint}: <root> (expected array)`)
     }
     return payload as ProfileSummary[]
   },
 
   getBundle: async (profileId: string): Promise<Bundle> => {
-    const endpoint = `/job-search/profiles/${profileId}/bundle`
+    const endpoint = taskPath(WORKSPACE_TASK_ID, `/profiles/${profileId}/bundle`)
     const payload = await request(endpoint)
     return parseResponse<Bundle>(payload, endpoint)
   },
@@ -60,7 +64,7 @@ export const api = {
     profileId: string,
     bundle: Bundle
   ): Promise<BundleSaveResponse> => {
-    const endpoint = `/job-search/profiles/${profileId}/bundle`
+    const endpoint = taskPath(WORKSPACE_TASK_ID, `/profiles/${profileId}/bundle`)
     const payload = await request(endpoint, {
       method: "PUT",
       body: JSON.stringify(bundle),
@@ -72,7 +76,7 @@ export const api = {
     profileId: string,
     step: string = "S3_execute"
   ): Promise<PromptResponse> => {
-    const endpoint = "/job-search/prompt/generate"
+    const endpoint = taskPath(WORKSPACE_TASK_ID, "/prompt/generate")
     const body: PromptRequest = { profile_id: profileId, step }
     const payload = await request(endpoint, {
       method: "POST",
@@ -85,7 +89,7 @@ export const api = {
     profileId: string,
     raw_jsonl: string
   ): Promise<JsonlResponse> => {
-    const endpoint = "/job-search/jsonl/validate"
+    const endpoint = taskPath(WORKSPACE_TASK_ID, "/jsonl/validate")
     const payload = await request(endpoint, {
       method: "POST",
       body: JSON.stringify({ profile_id: profileId, raw_jsonl }),
@@ -97,7 +101,7 @@ export const api = {
     profileId: string,
     records: Record<string, unknown>[]
   ): Promise<RunResponse> => {
-    const endpoint = "/job-search/run"
+    const endpoint = taskPath(WORKSPACE_TASK_ID, "/run")
     const body: RunRequest = { profile_id: profileId, records }
     const payload = await request(endpoint, {
       method: "POST",
@@ -107,7 +111,7 @@ export const api = {
   },
 
   generateCv: async (data: CvRequest): Promise<CvResponse> => {
-    const endpoint = "/gen-cv"
+    const endpoint = taskPath("gen_cv", "/actions/gen-cv")
     const payload = await request(endpoint, {
       method: "POST",
       body: JSON.stringify(data),

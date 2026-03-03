@@ -141,6 +141,8 @@ export function ResultsTab() {
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
               {run.metrics.processed} procesados / {run.metrics.skipped} omitidos
+              {" · gate "}
+              {Math.round((run.metrics.gate_pass_rate ?? 0) * 100)}%
             </div>
             <div className="h-3 w-px bg-border-subtle" />
             <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/60">

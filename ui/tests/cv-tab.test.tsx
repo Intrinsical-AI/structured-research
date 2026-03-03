@@ -34,9 +34,9 @@ vi.mock("@/lib/api-client", () => ({
 describe("CvTab critical flow", () => {
   beforeEach(() => {
     workspace = createWorkspaceMock({
-      activeProfileId: "profile_1",
+      activeProfileId: "profile_example",
       bundle: {
-        profile_id: "profile_1",
+        profile_id: "profile_example",
         user_profile: { name: "Jane Doe", seniority: "senior", skills: ["Python", "FastAPI"] },
         constraints: { domain: "job_search", must: [], prefer: [], avoid: [] },
         task: { gates: {}, soft_scoring: {} },
@@ -44,7 +44,7 @@ describe("CvTab critical flow", () => {
       },
       run: {
         run_id: "run-1",
-        profile_id: "profile_1",
+        profile_id: "profile_example",
         scored_records: [
           {
             id: "job-1",
@@ -62,6 +62,9 @@ describe("CvTab critical flow", () => {
           loaded: 1,
           processed: 1,
           skipped: 0,
+          gate_passed: 1,
+          gate_failed: 0,
+          gate_pass_rate: 1,
           started_at: "2026-02-22T05:05:00.123456",
           finished_at: "2026-02-22T05:05:00.223456",
         },
@@ -96,7 +99,7 @@ describe("CvTab critical flow", () => {
       expect(hoisted.apiMock.generateCv).toHaveBeenCalledTimes(1)
       expect(hoisted.apiMock.generateCv).toHaveBeenCalledWith(
         expect.objectContaining({
-          profile_id: "profile_1",
+          profile_id: "profile_example",
           llm_model: "lfm2.5-thinking",
           allow_mock_fallback: true,
         })

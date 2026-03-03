@@ -22,6 +22,8 @@ export async function POST(req: Request) {
   await new Promise((r) => setTimeout(r, 400))
 
   const scored_records = input.map(toScoredRecord)
+  const gate_passed = scored_records.filter((r) => r.gate_passed).length
+  const gate_failed = scored_records.length - gate_passed
   return NextResponse.json({
     run_id: `${profile_id || "profile"}-${Date.now()}`,
     profile_id,
@@ -30,6 +32,9 @@ export async function POST(req: Request) {
       loaded: input.length,
       processed: scored_records.length,
       skipped: 0,
+      gate_passed,
+      gate_failed,
+      gate_pass_rate: scored_records.length > 0 ? gate_passed / scored_records.length : 0,
       started_at,
       finished_at: new Date().toISOString(),
     },
