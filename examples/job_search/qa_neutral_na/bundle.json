@@ -1,0 +1,94 @@
+{
+    "profile_id": "qa_neutral_na",
+    "_comment": "Profile for testing neutral_if_na semantics. Must rule #1 (visa_sponsorship_offered=true, neutral_if_na=true): absent key -> None -> gate PASS; null value -> False -> gate FAIL. Must rule #2 (modality): standard check with no neutral_if_na. K8s prefer has neutral_if_na=true: absent field contributes 0 (not a failure).",
+    "constraints": {
+        "domain": "job_search",
+        "sources": {
+            "primary": ["linkedin"],
+            "secondary": [],
+            "fallback": []
+        },
+        "must": [
+            {
+                "field": "modality",
+                "op": "in",
+                "value": ["remote", "hybrid"],
+                "neutral_if_na": false,
+                "reason": "Remote or hybrid required."
+            },
+            {
+                "field": "visa_sponsorship_offered",
+                "op": "=",
+                "value": true,
+                "neutral_if_na": true,
+                "reason": "Visa sponsorship required — but absence is tolerated (neutral). Explicit false or null fails."
+            }
+        ],
+        "prefer": [
+            {
+                "field": "k8s_primary",
+                "op": "=",
+                "value": true,
+                "neutral_if_na": true,
+                "weight": 2.0,
+                "reason": "k8s preferred but field absence is neutral (no boost, no penalty)."
+            }
+        ],
+        "avoid": [
+            {
+                "field": "on_site_only",
+                "op": "=",
+                "value": true,
+                "severity": 3.0,
+                "reason": "Avoid on_site_only roles."
+            }
+        ],
+        "limits": {},
+        "relaxation": {
+            "order": [],
+            "steps": {},
+            "emit_constraints_diff": false
+        }
+    },
+    "task": {
+        "gates": {
+            "hard_filters_mode": "require_all",
+            "hard_filters": [],
+            "reject_anomalies": ["prompt_injection_suspected"],
+            "required_evidence_fields": []
+        },
+        "soft_scoring": {
+            "formula_version": "v2_soft_after_gates",
+            "prefer_weight_default": 1.0,
+            "avoid_penalty_default": 1.0,
+            "signal_boost": {
+                "salary_disclosed": 1.0,
+                "evidence_present": 0.5
+            },
+            "penalties": {
+                "incomplete": 1.5,
+                "missing_salary": 1.0,
+                "old_posting": 0.0,
+                "old_posting_threshold_days": 30,
+                "inference_used": 0.0,
+                "prompt_injection_suspected": 0.0,
+                "excess_hybrid_days": 0.0,
+                "excess_hybrid_days_threshold": 3
+            }
+        }
+    },
+    "task_config": {
+        "agent_name": "QA_NEUTRAL_NA_AGENT",
+        "version": "1.0",
+        "language_priority": ["en"],
+        "max_results": 20,
+        "target_results": [5, 15]
+    },
+    "user_profile": {
+        "timezone": "Europe/Madrid",
+        "mobility": "remote",
+        "risk_tolerance": "medium",
+        "currency_default": "EUR",
+        "language_preference": ["en"]
+    }
+}

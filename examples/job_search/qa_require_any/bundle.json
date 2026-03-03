@@ -1,0 +1,82 @@
+{
+    "profile_id": "qa_require_any",
+    "_comment": "Profile for testing hard_filters_mode=require_any (OR semantics). Hard filters: [modality=remote, geo.country=Spain]. With require_any: record passes if AT LEAST ONE filter passes. Cases: (remote, Germany) -> passes (modality=remote passes); (hybrid, Spain) -> passes (country=Spain passes); (hybrid, Germany) -> FAILS (both fail: 'hard_filters: all failed').",
+    "constraints": {
+        "domain": "job_search",
+        "sources": {
+            "primary": ["linkedin", "glassdoor"],
+            "secondary": [],
+            "fallback": []
+        },
+        "must": [],
+        "prefer": [
+            {
+                "field": "stack",
+                "op": "contains_any",
+                "value": ["python", "typescript"],
+                "weight": 1.5
+            }
+        ],
+        "avoid": [],
+        "limits": {},
+        "relaxation": {
+            "order": [],
+            "steps": {},
+            "emit_constraints_diff": false
+        }
+    },
+    "task": {
+        "gates": {
+            "hard_filters_mode": "require_any",
+            "hard_filters": [
+                {
+                    "field": "modality",
+                    "op": "=",
+                    "value": "remote",
+                    "reason": "Is fully remote?"
+                },
+                {
+                    "field": "geo.country",
+                    "op": "=",
+                    "value": "Spain",
+                    "reason": "Is based in Spain?"
+                }
+            ],
+            "reject_anomalies": [],
+            "required_evidence_fields": []
+        },
+        "soft_scoring": {
+            "formula_version": "v2_soft_after_gates",
+            "prefer_weight_default": 1.0,
+            "avoid_penalty_default": 1.0,
+            "signal_boost": {
+                "salary_disclosed": 1.0,
+                "evidence_present": 0.5
+            },
+            "penalties": {
+                "incomplete": 1.0,
+                "missing_salary": 0.5,
+                "old_posting": 0.0,
+                "old_posting_threshold_days": 30,
+                "inference_used": 0.0,
+                "prompt_injection_suspected": 0.0,
+                "excess_hybrid_days": 0.0,
+                "excess_hybrid_days_threshold": 3
+            }
+        }
+    },
+    "task_config": {
+        "agent_name": "QA_REQUIRE_ANY_AGENT",
+        "version": "1.0",
+        "language_priority": ["en"],
+        "max_results": 20,
+        "target_results": [5, 15]
+    },
+    "user_profile": {
+        "timezone": "Europe/Madrid",
+        "mobility": "remote",
+        "risk_tolerance": "medium",
+        "currency_default": "EUR",
+        "language_preference": ["en"]
+    }
+}

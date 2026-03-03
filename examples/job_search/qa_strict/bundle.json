@@ -1,0 +1,96 @@
+{
+    "profile_id": "qa_strict",
+    "constraints": {
+        "domain": "job_search",
+        "sources": {
+            "primary": ["linkedin", "glassdoor"],
+            "secondary": ["remoteok"],
+            "fallback": []
+        },
+        "must": [
+            {
+                "field": "modality",
+                "op": "in",
+                "value": ["remote", "hybrid"],
+                "reason": "Only remote or hybrid roles."
+            },
+            {
+                "field": "seniority.level",
+                "op": "in",
+                "value": ["senior", "staff"],
+                "reason": "Senior or staff level only."
+            }
+        ],
+        "prefer": [
+            {
+                "field": "stack",
+                "op": "contains_any",
+                "value": ["python", "typescript", "react", "golang", "rust"],
+                "weight": 2.0
+            }
+        ],
+        "avoid": [
+            {
+                "field": "seniority.level",
+                "op": "=",
+                "value": "junior",
+                "severity": 2.0,
+                "reason": "Avoid junior roles."
+            }
+        ],
+        "limits": {},
+        "relaxation": {
+            "order": [],
+            "steps": {},
+            "emit_constraints_diff": false
+        }
+    },
+    "task": {
+        "gates": {
+            "hard_filters_mode": "require_all",
+            "hard_filters": [
+                {
+                    "field": "economics.salary_eur_gross",
+                    "op": ">=",
+                    "value": 50000,
+                    "reason": "Minimum salary threshold for qa_strict."
+                }
+            ],
+            "reject_anomalies": ["prompt_injection_suspected"],
+            "required_evidence_fields": ["apply_url"]
+        },
+        "soft_scoring": {
+            "formula_version": "v2_soft_after_gates",
+            "prefer_weight_default": 1.5,
+            "avoid_penalty_default": 2.0,
+            "signal_boost": {
+                "salary_disclosed": 1.5,
+                "evidence_present": 0.5
+            },
+            "penalties": {
+                "incomplete": 2.0,
+                "missing_salary": 1.5,
+                "old_posting": 2.0,
+                "old_posting_threshold_days": 21,
+                "inference_used": 0.5,
+                "prompt_injection_suspected": 0.0,
+                "excess_hybrid_days": 1.5,
+                "excess_hybrid_days_threshold": 3
+            }
+        }
+    },
+    "task_config": {
+        "agent_name": "QA_STRICT_AGENT",
+        "version": "1.0",
+        "language_priority": ["en"],
+        "max_results": 20,
+        "target_results": [5, 15]
+    },
+    "user_profile": {
+        "timezone": "Europe/Madrid",
+        "mobility": "remote",
+        "risk_tolerance": "low",
+        "currency_default": "EUR",
+        "language_preference": ["en"]
+    }
+}

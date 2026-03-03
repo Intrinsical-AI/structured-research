@@ -2,8 +2,7 @@
   "agent_name": "AGENT_NAME",
   "version": "1.2.0",
   "gates": {
-    "must_pass_constraints_must": true,
-    "hard_filters_mode": "any",
+    "hard_filters_mode": "require_all",
     "hard_filters": [
       {
         "field": "field.path",

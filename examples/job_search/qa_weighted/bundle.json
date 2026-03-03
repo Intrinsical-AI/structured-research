@@ -1,63 +1,43 @@
 {
-    "profile_id": "profile_example",
+    "profile_id": "qa_weighted",
+    "_comment": "Profile for testing the 'weighted' operator. Max possible boost = 3.0+2.0+1.5+2.5+1.0 = 10.0. With base(5)+boost(10)+salary(1.5)+evidence(0.5)=17.0 → clamped to 10.0.",
     "constraints": {
         "domain": "job_search",
         "sources": {
-            "primary": [
-                "linkedin",
-                "glassdoor"
-            ],
-            "secondary": [
-                "remoteok"
-            ],
+            "primary": ["linkedin"],
+            "secondary": [],
             "fallback": []
         },
         "must": [
             {
                 "field": "modality",
                 "op": "in",
-                "value": [
-                    "remote",
-                    "hybrid"
-                ],
-                "reason": "I only want remote or hybrid jobs."
+                "value": ["remote", "hybrid"],
+                "reason": "Remote or hybrid only."
             }
         ],
         "prefer": [
             {
                 "field": "stack",
-                "op": "contains_any",
-                "value": [
-                    "python",
-                    "typescript",
-                    "react"
-                ],
-                "weight": 2.5
+                "op": "weighted",
+                "value": ["python", "typescript", "react", "kubernetes", "go"],
+                "weights": [3.0, 2.0, 1.5, 2.5, 1.0],
+                "reason": "Python most valued, then k8s, then typescript, react, go."
             }
         ],
-        "avoid": [
-            {
-                "field": "seniority.level",
-                "op": "=",
-                "value": "junior",
-                "severity": 1.0,
-                "reason": "Avoid junior roles if possible."
-            }
-        ],
+        "avoid": [],
         "limits": {},
         "relaxation": {
             "order": [],
             "steps": {},
             "emit_constraints_diff": false
         }
-        },
-        "task": {
+    },
+    "task": {
         "gates": {
             "hard_filters_mode": "require_all",
             "hard_filters": [],
-            "reject_anomalies": [
-                "prompt_injection_suspected"
-            ],
+            "reject_anomalies": [],
             "required_evidence_fields": []
         },
         "soft_scoring": {
@@ -69,32 +49,29 @@
                 "evidence_present": 0.5
             },
             "penalties": {
+                "incomplete": 1.0,
                 "missing_salary": 1.0,
-                "incomplete": 2.0
+                "old_posting": 0.0,
+                "old_posting_threshold_days": 30,
+                "inference_used": 0.0,
+                "prompt_injection_suspected": 0.0,
+                "excess_hybrid_days": 0.0,
+                "excess_hybrid_days_threshold": 3
             }
         }
     },
     "task_config": {
-        "agent_name": "JS_AGENT",
+        "agent_name": "QA_WEIGHTED_AGENT",
         "version": "1.0",
-        "language_priority": [
-            "en",
-            "es"
-        ],
+        "language_priority": ["en"],
         "max_results": 20,
-        "target_results": [
-            5,
-            15
-        ]
+        "target_results": [5, 15]
     },
     "user_profile": {
         "timezone": "Europe/Madrid",
         "mobility": "remote",
         "risk_tolerance": "medium",
         "currency_default": "EUR",
-        "language_preference": [
-            "en",
-            "es"
-        ]
+        "language_preference": ["en"]
     }
 }
