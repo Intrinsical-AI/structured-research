@@ -959,6 +959,7 @@ dependencies = [
 [package.optional-dependencies]
 api = [
     { name = "fastapi" },
+    { name = "langchain-ollama" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 ollama = [
@@ -977,6 +978,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.115" },
     { name = "jsonschema", specifier = ">=4.0.0" },
+    { name = "langchain-ollama", marker = "extra == 'api'", specifier = ">=0.2" },
     { name = "langchain-ollama", marker = "extra == 'ollama'", specifier = ">=0.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pyyaml" },
