@@ -96,7 +96,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# uv 
+# uv
 .uv_cache
 
 # import-linter
@@ -149,7 +149,7 @@ next-env.d.ts
 /ui/tsconfig.tsbuildinfo
 results/
 runs/
-config/job_search/profile_1
+config/job_search/profile_example
 config/job_search/profile_2
 /resources/projects
 profiles/
@@ -163,5 +163,5 @@ data/processed/**
 # Keep committed test fixtures under tests/fixtures/profiles
 !tests/fixtures/
 !tests/fixtures/profiles/
-!tests/fixtures/profiles/profile_1/
-!tests/fixtures/profiles/profile_1/bundle.json
+!tests/fixtures/profiles/profile_example/
+!tests/fixtures/profiles/profile_example/bundle.json

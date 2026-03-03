@@ -10,7 +10,6 @@ source_modules =
 forbidden_modules =
     structured_search.ports
     structured_search.infra
-    structured_search.tasks
     structured_search.api
     structured_search.application
 
@@ -21,7 +20,6 @@ source_modules =
     structured_search.ports
 forbidden_modules =
     structured_search.infra
-    structured_search.tasks
     structured_search.api
     structured_search.application
 
@@ -31,7 +29,6 @@ type = forbidden
 source_modules =
     structured_search.infra
 forbidden_modules =
-    structured_search.tasks
     structured_search.api
 
 [importlinter:application_rules]
@@ -42,14 +39,6 @@ source_modules =
 forbidden_modules =
     structured_search.api
 
-[importlinter:tasks_no_api]
-name = Tasks must not depend on API
-type = forbidden
-source_modules =
-    structured_search.tasks
-forbidden_modules =
-    structured_search.api
-
 [importlinter:api_controller_thin]
 name = API app stays thin and framework-facing
 type = forbidden
@@ -57,23 +46,6 @@ source_modules =
     structured_search.api.app
 forbidden_modules =
     structured_search.infra
-    structured_search.tasks
     structured_search.domain
     structured_search.ports
 allow_indirect_imports = True
-
-[importlinter:task_independence_job_to_cv]
-name = job_search task does not import gen_cv task
-type = forbidden
-source_modules =
-    structured_search.tasks.job_search
-forbidden_modules =
-    structured_search.tasks.gen_cv
-
-[importlinter:task_independence_cv_to_job]
-name = gen_cv task does not import job_search task
-type = forbidden
-source_modules =
-    structured_search.tasks.gen_cv
-forbidden_modules =
-    structured_search.tasks.job_search

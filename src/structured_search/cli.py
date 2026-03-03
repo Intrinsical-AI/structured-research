@@ -10,11 +10,14 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
-from structured_search.tasks.gen_cv import cli as gen_cv_cli
-from structured_search.tasks.job_search import cli as job_search_cli
+from pydantic import ValidationError
+
+from structured_search.application.core.ingest_service import ingest_validate_jsonl
+from structured_search.application.core.prompt_service import generate_prompt
+from structured_search.application.core.run_service import run_score, validate_run
+from structured_search.application.core.task_registry import get_task_registry
+from structured_search.contracts import GenCVRequest, RunScoreRequest
 from structured_search.tools import (
     export_openapi,
     export_ui_types,
@@ -29,7 +32,6 @@ from structured_search.tools import (
 DEFAULT_API_HOST = "127.0.0.1"
 DEFAULT_API_PORT = 8000
 DEFAULT_UI_PORT = 3000
-DEFAULT_API_BASE = f"http://{DEFAULT_API_HOST}:{DEFAULT_API_PORT}/v1"
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> int:
@@ -42,6 +44,22 @@ def _require_executable(name: str, install_hint: str) -> int:
         return 0
     print(f"Missing executable '{name}'. {install_hint}", file=sys.stderr)
     return 1
+
+
+def _plugin_or_exit(task_id: str):
+    registry = get_task_registry()
+    try:
+        return registry.get(task_id)
+    except KeyError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
+def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        for record in records:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def _cmd_quality_lint(_args: argparse.Namespace) -> int:
@@ -84,6 +102,8 @@ def _cmd_metrics_populate(args: argparse.Namespace) -> int:
     argv: list[str] = [
         "--api-base",
         args.api_base,
+        "--task-id",
+        args.task_id,
         "--profile-id",
         args.profile_id,
         "--glob",
@@ -98,124 +118,189 @@ def _cmd_metrics_populate(args: argparse.Namespace) -> int:
     return populate_jsonl_validate_metrics.main(argv)
 
 
-def _cmd_job_search_prompt(args: argparse.Namespace) -> int:
-    argv: list[str] = ["prompt", "--step", args.step]
-    if args.profile:
-        argv += ["--profile", args.profile]
-    if args.output:
-        argv += ["--output", args.output]
-    if args.prompts_dir:
-        argv += ["--prompts-dir", args.prompts_dir]
-    if args.constraints:
-        argv += ["--constraints", args.constraints]
-    if args.verbose:
-        argv.append("--verbose")
-    return job_search_cli.main(argv)
+def _cmd_tasks_list(_args: argparse.Namespace) -> int:
+    tasks = [item.model_dump(mode="json") for item in get_task_registry().list()]
+    print(json.dumps(tasks, indent=2, ensure_ascii=False))
+    return 0
 
 
-def _cmd_job_search_run(args: argparse.Namespace) -> int:
-    argv: list[str] = ["run", "--input", args.input_path, "--output", args.output_path]
-    if args.profile:
-        argv += ["--profile", args.profile]
-    if args.constraints:
-        argv += ["--constraints", args.constraints]
-    if args.verbose:
-        argv.append("--verbose")
-    return job_search_cli.main(argv)
-
-
-def _normalize_api_base(api_base: str) -> str:
-    base = api_base.rstrip("/")
-    if not base.endswith("/v1"):
-        base = f"{base}/v1"
-    return base
-
-
-def _call_json_endpoint(url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
-    req = urllib_request.Request(
-        url,
-        method="POST",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib_request.urlopen(req, timeout=timeout) as response:
-            body = response.read().decode("utf-8")
-    except urllib_error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code} on {url}: {detail}") from exc
-    except urllib_error.URLError as exc:
-        raise RuntimeError(f"Cannot reach {url}: {exc}") from exc
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON response from {url}: {body[:200]}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError(f"Unexpected response type from {url}: {type(payload).__name__}")
-    return payload
-
-
-def _cmd_job_search_run_validate(args: argparse.Namespace) -> int:
-    request_path = Path(args.request)
-    if not request_path.is_file():
-        print(f"Request file not found: {request_path}", file=sys.stderr)
-        return 1
-    try:
-        request_payload = json.loads(request_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        print(f"Invalid JSON in request file {request_path}: {exc}", file=sys.stderr)
-        return 1
-    if not isinstance(request_payload, dict):
-        print(f"Request payload must be an object: {request_path}", file=sys.stderr)
+def _cmd_task_prompt(args: argparse.Namespace) -> int:
+    plugin = _plugin_or_exit(args.task_id)
+    if not plugin.supports("prompt"):
+        print(f"Task {args.task_id!r} does not support prompt", file=sys.stderr)
         return 1
 
-    url = f"{_normalize_api_base(args.api_base)}/job-search/run/validate"
+    step_dir = Path("resources/prompts") / plugin.prompt_namespace / "steps"
+    if not step_dir.exists() or not any(step_dir.glob(f"{args.step}*.md")):
+        print(
+            f"Prompt step file not found for task={args.task_id!r} step={args.step!r} "
+            f"in {step_dir}",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
-        response = _call_json_endpoint(url, request_payload, args.timeout)
-    except RuntimeError as exc:
+        result = generate_prompt(
+            task_id=args.task_id,
+            profile_id=args.profile,
+            step=args.step,
+            plugin=plugin,
+        )
+    except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
-    print(json.dumps(response, indent=2, ensure_ascii=False))
-    if args.fail_on_not_ok and response.get("ok") is False:
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(result.prompt, encoding="utf-8")
+        print(f"Prompt written to {out}")
+    else:
+        print(result.prompt)
+    return 0
+
+
+def _cmd_task_run(args: argparse.Namespace) -> int:
+    plugin = _plugin_or_exit(args.task_id)
+    if not plugin.supports("run") or plugin.record_model is None:
+        print(f"Task {args.task_id!r} does not support run", file=sys.stderr)
+        return 1
+
+    input_path = Path(args.input_path)
+    if not input_path.is_file():
+        print(f"Input file not found: {input_path}", file=sys.stderr)
+        return 1
+
+    raw_text = input_path.read_text(encoding="utf-8")
+    ingest = ingest_validate_jsonl(raw_text=raw_text, record_model=plugin.record_model)
+
+    request = RunScoreRequest(
+        profile_id=args.profile,
+        records=ingest.valid,
+        require_snapshot=args.require_snapshot,
+    )
+
+    try:
+        summary = run_score(task_id=args.task_id, request=request, plugin=plugin)
+    except Exception as exc:
+        print(f"Run failed: {exc}", file=sys.stderr)
+        return 1
+
+    output_path = Path(args.output_path)
+    _write_jsonl(output_path, summary.records)
+
+    print(f"Loaded lines:      {ingest.stats.total_lines}")
+    print(f"Schema valid:      {ingest.stats.schema_ok}")
+    print(f"Schema invalid:    {ingest.stats.schema_errors}")
+    print(f"Scored records:    {len(summary.records)}")
+    print(f"Gate passed:       {summary.gate_passed}")
+    print(f"Gate failed:       {summary.gate_failed}")
+    print(f"Output:            {output_path}")
+    return 0
+
+
+def _load_run_request_from_input(
+    *, plugin, profile_id: str, input_path: Path, require_snapshot: bool
+):
+    raw_text = input_path.read_text(encoding="utf-8")
+    ingest = ingest_validate_jsonl(raw_text=raw_text, record_model=plugin.record_model)
+    request = RunScoreRequest(
+        profile_id=profile_id,
+        records=ingest.valid,
+        require_snapshot=require_snapshot,
+    )
+    return request
+
+
+def _cmd_task_run_validate(args: argparse.Namespace) -> int:
+    plugin = _plugin_or_exit(args.task_id)
+    if not plugin.supports("run") or plugin.record_model is None:
+        print(f"Task {args.task_id!r} does not support run-validate", file=sys.stderr)
+        return 1
+
+    if args.request:
+        request_path = Path(args.request)
+        if not request_path.is_file():
+            print(f"Request file not found: {request_path}", file=sys.stderr)
+            return 1
+        try:
+            payload = json.loads(request_path.read_text(encoding="utf-8"))
+            request = RunScoreRequest.model_validate(payload)
+        except (json.JSONDecodeError, ValidationError) as exc:
+            print(f"Invalid run request file: {exc}", file=sys.stderr)
+            return 1
+    else:
+        input_path = Path(args.input_path)
+        if not input_path.is_file():
+            print(f"Input file not found: {input_path}", file=sys.stderr)
+            return 1
+        request = _load_run_request_from_input(
+            plugin=plugin,
+            profile_id=args.profile,
+            input_path=input_path,
+            require_snapshot=args.require_snapshot,
+        )
+
+    try:
+        response = validate_run(task_id=args.task_id, request=request, plugin=plugin)
+    except Exception as exc:
+        print(f"Validation failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(json.dumps(response.model_dump(mode="json"), indent=2, ensure_ascii=False))
+    if args.fail_on_not_ok and response.ok is False:
         return 2
     return 0
 
 
-def _cmd_gen_cv_run(args: argparse.Namespace) -> int:
-    argv: list[str] = ["run", "--job", args.job, "--candidate", args.candidate]
-    if args.profile:
-        argv += ["--profile", args.profile]
-    if args.atoms_dir:
-        argv += ["--atoms-dir", args.atoms_dir]
-    if args.llm_model:
-        argv += ["--llm-model", args.llm_model]
-    if args.prompts_dir:
-        argv += ["--prompts-dir", args.prompts_dir]
-    if args.output:
-        argv += ["--output", args.output]
-    if args.verbose:
-        argv.append("--verbose")
-    return gen_cv_cli.main(argv)
+def _cmd_task_action(args: argparse.Namespace) -> int:
+    plugin = _plugin_or_exit(args.task_id)
+    action_name = args.name
+    if not plugin.supports(f"action:{action_name}"):
+        print(
+            f"Task {args.task_id!r} does not support action {action_name!r}",
+            file=sys.stderr,
+        )
+        return 1
 
+    handler = plugin.action_handlers.get(action_name)
+    if handler is None:
+        print(f"Action handler not found for {action_name!r}", file=sys.stderr)
+        return 1
 
-def _cmd_gen_cv_prompt(args: argparse.Namespace) -> int:
-    argv: list[str] = ["prompt", "--job", args.job, "--candidate", args.candidate]
-    if args.profile:
-        argv += ["--profile", args.profile]
-    if args.atoms_dir:
-        argv += ["--atoms-dir", args.atoms_dir]
-    if args.prompts_dir:
-        argv += ["--prompts-dir", args.prompts_dir]
-    for claim_id in args.allowed_claim_ids:
-        argv += ["--allowed-claim-id", claim_id]
-    if args.output:
-        argv += ["--output", args.output]
-    if args.base_output:
-        argv += ["--base-output", args.base_output]
-    if args.verbose:
-        argv.append("--verbose")
-    return gen_cv_cli.main(argv)
+    request_path = Path(args.request)
+    if not request_path.is_file():
+        print(f"Request file not found: {request_path}", file=sys.stderr)
+        return 1
+
+    try:
+        payload = json.loads(request_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"Invalid JSON in request file: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        if action_name == "gen-cv":
+            request = GenCVRequest.model_validate(payload)
+            response = handler(
+                profile_id=request.profile_id,
+                job=request.job,
+                candidate_profile=request.candidate_profile,
+                selected_claim_ids=request.selected_claim_ids,
+                llm_model=request.llm_model,
+                allow_mock_fallback=request.allow_mock_fallback,
+            )
+        else:
+            response = handler(**payload)
+    except Exception as exc:
+        print(f"Action failed: {exc}", file=sys.stderr)
+        return 1
+
+    if hasattr(response, "model_dump"):
+        print(json.dumps(response.model_dump(mode="json"), indent=2, ensure_ascii=False))
+    else:
+        print(json.dumps(response, indent=2, ensure_ascii=False))
+    return 0
 
 
 def _cmd_api_serve(args: argparse.Namespace) -> int:
@@ -400,11 +485,15 @@ def build_parser() -> argparse.ArgumentParser:
     metrics_report.add_argument("--days", type=int, default=7)
     metrics_report.add_argument("--json", action="store_true")
     metrics_report.set_defaults(func=_cmd_metrics_report)
+
     metrics_populate = metrics_sub.add_parser(
-        "populate", help="Call /job-search/jsonl/validate over result files"
+        "populate", help="Call task JSONL validation endpoint"
     )
-    metrics_populate.add_argument("--api-base", default=DEFAULT_API_BASE)
-    metrics_populate.add_argument("--profile-id", default="profile_1")
+    metrics_populate.add_argument(
+        "--api-base", default=f"http://{DEFAULT_API_HOST}:{DEFAULT_API_PORT}/v1"
+    )
+    metrics_populate.add_argument("--task-id", default="job_search")
+    metrics_populate.add_argument("--profile-id", default="profile_example")
     metrics_populate.add_argument("--input", dest="inputs", action="append", default=[])
     metrics_populate.add_argument(
         "--glob", dest="glob_pattern", default="results/job_search/**/results.jsonl"
@@ -413,70 +502,51 @@ def build_parser() -> argparse.ArgumentParser:
     metrics_populate.add_argument("--timeout", type=float, default=30.0)
     metrics_populate.set_defaults(func=_cmd_metrics_populate)
 
-    job = subparsers.add_parser("job-search", help="Job-search prompt/run workflows")
-    job_sub = job.add_subparsers(dest="job_cmd")
-    job_prompt = job_sub.add_parser("prompt", help="Compose extraction prompt")
-    job_prompt.add_argument("--profile", default=None)
-    job_prompt.add_argument("--step", default="S3_execute")
-    job_prompt.add_argument("--output", default=None)
-    job_prompt.add_argument("--prompts-dir", default=None)
-    job_prompt.add_argument("--constraints", default=None)
-    job_prompt.add_argument("--verbose", action="store_true")
-    job_prompt.set_defaults(func=_cmd_job_search_prompt)
+    tasks_parser = subparsers.add_parser("tasks", help="Task registry operations")
+    tasks_sub = tasks_parser.add_subparsers(dest="tasks_cmd")
+    tasks_list = tasks_sub.add_parser("list", help="List registered tasks")
+    tasks_list.set_defaults(func=_cmd_tasks_list)
 
-    job_run = job_sub.add_parser("run", help="Run ETL scoring pipeline over JSONL")
-    job_run.add_argument("--profile", default=None)
-    job_run.add_argument("--input", dest="input_path", required=True)
-    job_run.add_argument("--output", dest="output_path", required=True)
-    job_run.add_argument("--constraints", default=None)
-    job_run.add_argument("--verbose", action="store_true")
-    job_run.set_defaults(func=_cmd_job_search_run)
+    task = subparsers.add_parser("task", help="Execute one task workflow")
+    task.add_argument("task_id", help="Task identifier (e.g., job_search, product_search, gen_cv)")
+    task_sub = task.add_subparsers(dest="task_cmd")
 
-    job_validate = job_sub.add_parser("run-validate", help="Dry-run preflight against /run")
-    job_validate.add_argument("--request", required=True, help="JSON file with /run payload")
-    job_validate.add_argument("--api-base", default=DEFAULT_API_BASE)
-    job_validate.add_argument("--timeout", type=float, default=30.0)
-    job_validate.add_argument(
+    task_prompt = task_sub.add_parser("prompt", help="Compose extraction prompt")
+    task_prompt.add_argument("--profile", required=True)
+    task_prompt.add_argument("--step", default="S3_execute")
+    task_prompt.add_argument("--output", default=None)
+    task_prompt.set_defaults(func=_cmd_task_prompt)
+
+    task_run = task_sub.add_parser("run", help="Run deterministic scoring on JSONL input")
+    task_run.add_argument("--profile", required=True)
+    task_run.add_argument("--input", dest="input_path", required=True)
+    task_run.add_argument("--output", dest="output_path", required=True)
+    task_run.add_argument("--require-snapshot", action="store_true")
+    task_run.set_defaults(func=_cmd_task_run)
+
+    task_validate = task_sub.add_parser("run-validate", help="Dry-run validate run prerequisites")
+    task_validate.add_argument(
+        "--request", default=None, help="JSON file with RunScoreRequest payload"
+    )
+    task_validate.add_argument(
+        "--profile", default="profile_example", help="Used when --request is omitted"
+    )
+    task_validate.add_argument(
+        "--input", dest="input_path", default=None, help="Used when --request is omitted"
+    )
+    task_validate.add_argument("--require-snapshot", action="store_true")
+    task_validate.add_argument(
         "--allow-not-ok",
         action="store_false",
         dest="fail_on_not_ok",
         help="Return 0 even if response.ok is false",
     )
-    job_validate.set_defaults(func=_cmd_job_search_run_validate, fail_on_not_ok=True)
+    task_validate.set_defaults(func=_cmd_task_run_validate, fail_on_not_ok=True)
 
-    gen_cv = subparsers.add_parser("gen-cv", help="CV generation workflows")
-    gen_cv_sub = gen_cv.add_subparsers(dest="gen_cv_cmd")
-    gen_cv_prompt = gen_cv_sub.add_parser(
-        "prompt",
-        help="Render GEN_CV prompt with atoms embedded and export Markdown files",
-    )
-    gen_cv_prompt.add_argument("--job", required=True)
-    gen_cv_prompt.add_argument("--candidate", required=True)
-    gen_cv_prompt.add_argument("--profile", default=None)
-    gen_cv_prompt.add_argument("--atoms-dir", default=None)
-    gen_cv_prompt.add_argument("--prompts-dir", default="resources/prompts")
-    gen_cv_prompt.add_argument(
-        "--allowed-claim-id",
-        action="append",
-        dest="allowed_claim_ids",
-        default=[],
-        help="Restrict grounded claims to specific IDs (repeatable)",
-    )
-    gen_cv_prompt.add_argument("--output", default="gen_cv_prompt.md")
-    gen_cv_prompt.add_argument("--base-output", default=None)
-    gen_cv_prompt.add_argument("--verbose", action="store_true")
-    gen_cv_prompt.set_defaults(func=_cmd_gen_cv_prompt)
-
-    gen_cv_run = gen_cv_sub.add_parser("run", help="Generate CV JSON")
-    gen_cv_run.add_argument("--job", required=True)
-    gen_cv_run.add_argument("--candidate", required=True)
-    gen_cv_run.add_argument("--profile", default=None)
-    gen_cv_run.add_argument("--atoms-dir", default=None)
-    gen_cv_run.add_argument("--llm-model", default="lfm2.5-thinking")
-    gen_cv_run.add_argument("--prompts-dir", default=None)
-    gen_cv_run.add_argument("--output", default="cv.json")
-    gen_cv_run.add_argument("--verbose", action="store_true")
-    gen_cv_run.set_defaults(func=_cmd_gen_cv_run)
+    task_action = task_sub.add_parser("action", help="Execute a task action handler")
+    task_action.add_argument("--name", required=True, help="Action name (e.g., gen-cv)")
+    task_action.add_argument("--request", required=True, help="JSON request payload file")
+    task_action.set_defaults(func=_cmd_task_action)
 
     api = subparsers.add_parser("api", help="HTTP API operations")
     api_sub = api.add_subparsers(dest="api_cmd")
@@ -504,7 +574,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     dev_ui = dev_sub.add_parser("ui", help="Run UI dev server")
     dev_ui.add_argument("--ui-dir", default="ui")
-    dev_ui.add_argument("--api-base", default=DEFAULT_API_BASE)
+    dev_ui.add_argument("--api-base", default=f"http://{DEFAULT_API_HOST}:{DEFAULT_API_PORT}/v1")
     dev_ui.add_argument("--ui-port", type=int, default=DEFAULT_UI_PORT)
     dev_ui.set_defaults(func=_cmd_dev_ui)
 
@@ -530,12 +600,14 @@ def build_parser() -> argparse.ArgumentParser:
     tools_validate_results.set_defaults(func=_cmd_tools_validate_results)
 
     tools_validate_atoms = tools_sub.add_parser("validate-atoms")
-    tools_validate_atoms.add_argument("--atoms-dir", default="config/job_search/profile_1/atoms")
     tools_validate_atoms.add_argument(
-        "--schemas-dir", default="config/job_search/profile_1/atoms/schemas"
+        "--atoms-dir", default="config/job_search/profile_example/atoms"
     )
     tools_validate_atoms.add_argument(
-        "--canon-tags", default="config/job_search/profile_1/atoms/canon_tags.yaml"
+        "--schemas-dir", default="config/job_search/profile_example/atoms/schemas"
+    )
+    tools_validate_atoms.add_argument(
+        "--canon-tags", default="config/job_search/profile_example/atoms/canon_tags.yaml"
     )
     tools_validate_atoms.set_defaults(func=_cmd_tools_validate_atoms)
 
@@ -545,26 +617,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     tools_extract_p2 = tools_sub.add_parser("extract-p2-postings")
     tools_extract_p2.add_argument(
-        "--input",
-        dest="input_path",
-        default="results/job_search/profile_1/result.jsonl",
+        "--input", dest="input_path", default="results/job_search/profile_example/result.jsonl"
     )
     tools_extract_p2.add_argument(
-        "--output-dir",
-        default="results/job_search/profile_1/postings",
+        "--output-dir", default="results/job_search/profile_example/postings"
     )
     tools_extract_p2.set_defaults(func=_cmd_tools_extract_p2)
 
     tools_export_openapi = tools_sub.add_parser(
-        "export-openapi",
-        help="Export FastAPI OpenAPI contract JSON",
+        "export-openapi", help="Export FastAPI OpenAPI contract JSON"
     )
     tools_export_openapi.add_argument("--output", default="docs/openapi_v1.json")
     tools_export_openapi.set_defaults(func=_cmd_tools_export_openapi)
 
     tools_export_ui_types = tools_sub.add_parser(
-        "export-ui-types",
-        help="Export TypeScript UI API types from OpenAPI JSON",
+        "export-ui-types", help="Export TypeScript UI API types from OpenAPI JSON"
     )
     tools_export_ui_types.add_argument("--openapi", default="docs/openapi_v1.json")
     tools_export_ui_types.add_argument("--output", default="ui/lib/generated/api-types.ts")

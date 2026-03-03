@@ -2,7 +2,7 @@
         api-contract-export \
         ui-types-export \
         contract-sync \
-        job-search-prompt job-search-run job-search-run-validate gen-cv gen-cv-prompt \
+        job-search-prompt job-search-run job-search-run-validate gen-cv \
         check-api-prereqs check-ui-prereqs check-dev-prereqs \
         api-install ui-install api-dev ui-dev dev
 
@@ -129,7 +129,7 @@ dev: check-dev-prereqs
 PROFILE ?= profile_1
 
 job-search-prompt:
-	uv run structured-search job-search prompt \
+	uv run structured-search task job_search prompt \
 		--profile $(PROFILE) \
 		--step S3_execute \
 		$(if $(OUTPUT),--output $(OUTPUT),)
@@ -138,52 +138,31 @@ job-search-run:
 ifndef INPUT
 	$(error INPUT is required: make job-search-run INPUT=raw.jsonl [OUTPUT=scored.jsonl] [PROFILE=profile_1])
 endif
-	uv run structured-search job-search run \
+	uv run structured-search task job_search run \
 		--profile $(PROFILE) \
 		--input $(INPUT) \
 		--output $(or $(OUTPUT),data/processed/jobs_scored.jsonl)
 
 job-search-run-validate:
 ifndef REQUEST
-	$(error REQUEST is required: make job-search-run-validate REQUEST=run_request.json [API_BASE=http://127.0.0.1:8000/v1])
+	$(error REQUEST is required: make job-search-run-validate REQUEST=run_request.json)
 endif
-	uv run structured-search job-search run-validate \
-		--request "$(REQUEST)" \
-		--api-base "$(API_BASE)"
+	uv run structured-search task job_search run-validate \
+		--request "$(REQUEST)"
 
 # ── Gen CV ────────────────────────────────────────────────────────────────────
 #
 #   Requires a local Ollama instance.
 #
 #   Usage:
-#     make gen-cv-prompt JOB=job.json CANDIDATE=profile.json
-#     make gen-cv JOB=job.json CANDIDATE=profile.json
-#     make gen-cv JOB=job.json CANDIDATE=profile.json PROFILE=profile_1
-
-gen-cv-prompt:
-ifndef JOB
-	$(error JOB is required: make gen-cv-prompt JOB=job.json CANDIDATE=profile.json)
-endif
-ifndef CANDIDATE
-	$(error CANDIDATE is required: make gen-cv-prompt JOB=job.json CANDIDATE=profile.json)
-endif
-	uv run structured-search gen-cv prompt \
-		--profile $(PROFILE) \
-		--job $(JOB) \
-		--candidate $(CANDIDATE) \
-		$(if $(ATOMS_DIR),--atoms-dir $(ATOMS_DIR),) \
-		--output $(or $(OUTPUT),data/cvs/gen_cv_prompt.md) \
-		$(if $(BASE_OUTPUT),--base-output $(BASE_OUTPUT),)
+#     make gen-cv REQUEST=gen_cv_request.json
+#     make gen-cv REQUEST=gen_cv_request.json OUTPUT=data/cvs/cv_response.json
 
 gen-cv:
-ifndef JOB
-	$(error JOB is required: make gen-cv JOB=job.json CANDIDATE=profile.json)
+ifndef REQUEST
+	$(error REQUEST is required: make gen-cv REQUEST=gen_cv_request.json [OUTPUT=data/cvs/cv_response.json])
 endif
-ifndef CANDIDATE
-	$(error CANDIDATE is required: make gen-cv JOB=job.json CANDIDATE=profile.json)
-endif
-	uv run structured-search gen-cv run \
-		--profile $(PROFILE) \
-		--job $(JOB) \
-		--candidate $(CANDIDATE) \
-		--output $(or $(OUTPUT),data/cvs/cv.json)
+	uv run structured-search task gen_cv action \
+		--name gen-cv \
+		--request "$(REQUEST)" \
+		> $(or $(OUTPUT),data/cvs/cv_response.json)
