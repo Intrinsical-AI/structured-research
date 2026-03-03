@@ -1,6 +1,8 @@
-# Task Configuration Templates
+# Task Configuration and Templates
 
-Reference guide for the JSON templates under `config/templates/`.
+Reference for profile bundles and JSON templates under `config/templates/`.
+
+Templates available:
 - `config/templates/constraints.template.json`
 - `config/templates/task.template.json`
 - `config/templates/task_config.template.json`
@@ -8,172 +10,115 @@ Reference guide for the JSON templates under `config/templates/`.
 - `config/templates/domain_schema.template.json`
 - `config/templates/schema.template.json`
 
-## 1) Runtime profile model
+## 1) Runtime model
 
-For each profile, the canonical runtime file is:
+The runtime reads a single bundle file per task/profile:
 
-- `config/<task_name>/<profile_id>/bundle.json`
+- `config/{task_id}/{profile_id}/bundle.json`
 
-For current built-in flow, this is:
+Equivalent path if `PROFILES_BASE` is overridden:
 
-- `config/job_search/<profile_id>/bundle.json`
+- `{PROFILES_BASE}/{task_id}/{profile_id}/bundle.json`
 
-`bundle.json` must include:
+The runtime does not read split files like `constraints.json` or `task.json` directly.
 
-- `constraints` (required)
-- `task` (required)
-- `task_config` (required)
+## 2) Required bundle shape
+
+Minimum required top-level sections in `bundle.json`:
+- `constraints` (object)
+- `task` (object)
+- `task_config` (object)
 
 Optional sections:
+- `user_profile` (object or `null`)
+- `domain_schema` (object or `null`)
+- `result_schema` (object or `null`)
 
-- `user_profile`
-- `domain_schema`
-- `result_schema`
+Notes:
+- `task_id` and `profile_id` may be present in file payload, but path params are the source of truth in API writes.
+- Missing required sections fail bundle load/save validation.
 
-## 2) Template-to-bundle mapping
+## 3) Task-specific validation behavior
 
-| Template file | Bundle field | Required | Runtime usage |
-|---|---|---|---|
-| `constraints.template.json` | `constraints` | Yes | Used by scoring gates/soft rules and field-path validation warnings |
-| `task.template.json` | `task` | Yes | `gates` + `soft_scoring` are consumed by scorer config loader |
-| `task_config.template.json` | `task_config` | Yes | General runtime metadata; `runtime.llm.model` is used by `gen-cv` fallback model resolution |
-| `user_profile.template.json` | `user_profile` | No | Used by prompt generation (`## Candidate Profile`) and profile metadata |
-| `domain_schema.template.json` | `domain_schema` | No | Stored as profile metadata (not directly used in scorer pipeline) |
-| `schema.template.json` | `result_schema` | No | Stored as profile metadata; can be used for schema documentation/custom tooling |
+Validation is plugin-dependent.
 
-## 3) Template details
+### 3.1 Scoring tasks (`job_search`, `product_search`)
 
-### 4.1 `constraints.template.json`
+In addition to the required top-level sections:
+- `constraints` must validate against task constraints model.
+- `task` must include valid `gates` and `soft_scoring` payload.
+- rule field paths are checked against the task record model.
 
-Purpose: define hard/soft search constraints.
+Unknown field paths in rules are warnings, not hard errors.
 
-Main sections:
+### 3.2 Action-only task (`gen_cv`)
 
-- `domain`
-- `sources` (`primary`, `secondary`, `fallback`)
-- `must` (hard rules)
-- `prefer` (soft boosts)
-- `avoid` (soft penalties)
-- `limits`
-- `relaxation`
+- `constraints` still uses base constraints model (must include `domain`).
+- `task` can be `{}` (no scoring runtime validation).
+- `task_config.runtime.llm.model` is used in model-resolution chain for CV generation.
 
-Rule format uses `ConstraintRule` semantics:
+## 4) Template-to-bundle mapping
+
+| Template | Bundle field | Required | Used at runtime |
+| --- | --- | --- | --- |
+| `constraints.template.json` | `constraints` | yes | gating/scoring constraints, rule semantics |
+| `task.template.json` | `task` | yes | `gates` and `soft_scoring` for scoring tasks |
+| `task_config.template.json` | `task_config` | yes | runtime metadata; `runtime.llm.model` for `gen_cv` |
+| `user_profile.template.json` | `user_profile` | no | prompt augmentation (`## Candidate Profile`) for prompt-capable tasks |
+| `domain_schema.template.json` | `domain_schema` | no | metadata only (not consumed by scorer) |
+| `schema.template.json` | `result_schema` | no | metadata only (external validation/docs tooling) |
+
+Important: templates include placeholder/example fields and extra metadata. Not all keys are consumed by runtime logic.
+
+## 5) Constraint rule semantics
+
+Rules in `constraints.must`, `constraints.prefer`, `constraints.avoid` follow `ConstraintRule`:
 
 - `field`: dotted path (example: `geo.region`)
 - `op`: one of `=`, `in`, `contains_any`, `contains_all`, `>=`, `<=`, `<`, `>`, `weighted`
-- `value`: operator payload
-- optional: `weight`, `weights`, `severity`, `neutral_if_na`, `reason`
+- `value`: payload for operator
+- optional fields: `weight`, `weights`, `severity`, `neutral_if_na`, `reason`, `time_decay_half_life_days`
 
-### 4.2 `task.template.json`
+Validation examples:
+- `weighted` requires `weights` and same length as `value`.
+- list operators require list `value`.
+- compare operators require numeric `value`.
 
-Purpose: define task-level scoring behavior and related task metadata.
+## 6) Build a new profile bundle
 
-Runtime-critical sections:
-
-- `gates`
-- `soft_scoring`
-
-Current scorer loader (`task_json_to_scoring_config`) reads:
-
-- `gates.hard_filters_mode` (`any|all|require_any|require_all`)
-- `gates.hard_filters`
-- `gates.reject_anomalies`
-- `gates.required_evidence_fields`
-- `soft_scoring.formula_version`
-- `soft_scoring.prefer_weight_default`
-- `soft_scoring.avoid_penalty_default`
-- `soft_scoring.signal_boost`
-- `soft_scoring.penalties`
-
-Other sections in this template (for example `deterministic_scoring`, `normalization`, `dedupe`) are allowed as task metadata and may be consumed by custom tooling.
-
-### 4.3 `task_config.template.json`
-
-Purpose: task runtime parameters and operational metadata.
-
-Typical content:
-
-- language/output preferences
-- result targets
-- runtime tuning
-- capabilities flags
-- artifact naming conventions
-
-Important note:
-
-- For `gen-cv` API flow, `task_config.runtime.llm.model` is part of the model name resolution chain.
-
-### 4.4 `user_profile.template.json`
-
-Purpose: optional candidate/user context attached to the profile.
+### 6.1 Preferred: copy an existing working profile
 
 Examples:
 
-- focus roles
-- seniority and stack preferences
-- process preferences
-- commute policy
-- availability
+```bash
+cp -r config/job_search/profile_1 config/job_search/profile_new
+cp -r config/product_search/profile_default config/product_search/profile_new
+cp -r config/gen_cv/profile_1 config/gen_cv/profile_new
+```
 
-Usage:
+Then edit `config/{task_id}/profile_new/bundle.json`.
 
-- included in prompt-generation output in API/application flow as `## Candidate Profile` when present.
+### 6.2 From templates
 
-### 4.5 `domain_schema.template.json`
+Compose a single `bundle.json` manually by embedding template sections under:
+- `constraints`
+- `task`
+- `task_config`
+- optional sections
 
-Purpose: optional domain-level schema metadata and validation policy description.
-
-Usage:
-
-- persisted in bundle as `domain_schema`
-- useful as explicit domain contract for teams and custom validators
-
-### 4.6 `schema.template.json`
-
-Purpose: optional JSON Schema for result record shape.
-
-Usage:
-
-- persisted in bundle as `result_schema`
-- useful for external validation/documentation pipelines
-
-## 5) Bootstrap a new profile from templates
-
-Example (job search profile):
+You can also scaffold a new task layout with:
 
 ```bash
-mkdir -p config/job_search/profile_new
-cp config/templates/constraints.template.json config/job_search/profile_new/constraints.json
-cp config/templates/task.template.json config/job_search/profile_new/task.json
-cp config/templates/task_config.template.json config/job_search/profile_new/task_config.json
-cp config/templates/user_profile.template.json config/job_search/profile_new/user_profile.json
-cp config/templates/domain_schema.template.json config/job_search/profile_new/domain_schema.json
-cp config/templates/schema.template.json config/job_search/profile_new/result_schema.json
+uv run structured-search tools scaffold-task --name <new_task_id>
 ```
 
-Then compose `bundle.json`:
+## 7) Minimal valid examples
+
+### 7.1 Scoring task (`job_search` / `product_search`)
 
 ```json
 {
-  "profile_id": "profile_new",
-  "constraints": {},
-  "task": {},
-  "task_config": {},
-  "user_profile": {},
-  "domain_schema": {},
-  "result_schema": {}
-}
-```
-
-Populate each object with the corresponding template payload.
-
-## 6) Minimal valid bundle
-
-This is the minimum shape accepted by bundle persistence validation:
-
-```json
-{
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "constraints": {
     "domain": "job_search",
     "must": [],
@@ -182,7 +127,7 @@ This is the minimum shape accepted by bundle persistence validation:
   },
   "task": {
     "gates": {
-      "hard_filters_mode": "any",
+      "hard_filters_mode": "require_all",
       "hard_filters": [],
       "reject_anomalies": [],
       "required_evidence_fields": []
@@ -202,16 +147,38 @@ This is the minimum shape accepted by bundle persistence validation:
 }
 ```
 
-## 7) Validation behavior and common mistakes
+### 7.2 Action task (`gen_cv`)
 
-`PUT /v1/job-search/profiles/{profile_id}/bundle` returns:
+```json
+{
+  "profile_id": "profile_example",
+  "constraints": {
+    "domain": "gen_cv",
+    "must": [],
+    "prefer": [],
+    "avoid": []
+  },
+  "task": {},
+  "task_config": {
+    "runtime": {
+      "llm": {
+        "model": "lfm2.5-thinking"
+      }
+    }
+  }
+}
+```
 
-- `ok: true` when valid (may still include warnings)
-- `ok: false` when invalid
+## 8) Save/validation behavior via API
+
+`PUT /v1/tasks/{task_id}/profiles/{profile_id}/bundle` always returns HTTP `200` with:
+
+- `ok: true` and optional warnings in `errors`
+- `ok: false` with validation errors in `errors`
 
 Common issues:
-
-- missing one of `constraints`, `task`, `task_config`
-- invalid rule operator payloads (`weighted` without `weights`, non-list values for list operators, etc.)
-- unknown field paths in rules (reported as warnings, not hard errors)
-- using placeholders like `<task_name>` without replacing them
+- missing `constraints`, `task`, or `task_config`
+- invalid rule payloads (`weighted` without valid `weights`, etc.)
+- invalid scoring runtime structure for scoring tasks (`gates`/`soft_scoring` missing)
+- non-object `task_config`
+- placeholder values not adapted to the real task schema

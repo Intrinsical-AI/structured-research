@@ -26,7 +26,7 @@ Adopt a hexagonal modular monolith:
 - `domain/`: pure models and invariants.
 - `ports/`: capability contracts (ABCs/Protocols).
 - `infra/`: adapter implementations.
-- `tasks/`: vertical use cases (`job_search`, `gen_cv`).
+- `application/core/`: task plugin orchestration and use cases.
 - `api/`: HTTP delivery and route wiring.
 
 ### Alternatives considered
@@ -55,8 +55,8 @@ Adopt a hexagonal modular monolith:
 ### Decision
 
 Persist operational state on filesystem:
-- Profiles/bundles in `config/job_search/{profile}/bundle.json`.
-- Atoms in YAML under `config/job_search/{profile}/atoms/`.
+- Profiles/bundles in `config/{task_id}/{profile}/bundle.json`.
+- Atoms in YAML under `config/{task_id}/{profile}/atoms/`.
 - Run snapshots in `runs/{run_id}/`.
 
 No relational/document database is introduced at this stage.

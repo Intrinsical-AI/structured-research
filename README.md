@@ -3,113 +3,144 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI 0.115+](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-> Disclaimer: do not use this project in a production environment, only local usage. E.g: CORS setted open(`allow_origins=["*"]`).
+`structured-search` is a local-first framework for **task-scoped, auditable LLM workflows**.
 
-Structured Search is a local-first framework for general **structured search workflows and tasks**.
+Core characteristics:
+- probabilistic upstream extraction/generation via LLM
+- deterministic schema validation
+- deterministic gates + soft scoring
+- task/plugin architecture (`job_search`, `product_search`, `gen_cv`)
 
-It combines:
+## Quick Start
 
-- non-deterministic structured extraction via LLMs
-- deterministic strict schema validation
-- deterministic post-processing (gates + scoring)
-
-Supported tasks (custom):
-
-- `job_search`: workflow with guardrails. Constrains + user + preferences. Exploring + soft ranking over extracted job postings.
-- `gen_cv`: grounded CV generation using curated atoms with user background (`context`, `claim`, `evidence`)
-
-## Why this exists
-
-LLMs are strong for exploration, weak for repeatability.
-
-This project separates concerns:
-
-- upstream extraction can be probabilistic
-- downstream validation/scoring is deterministic for the same input + config
-
-That gives better traceability, safer iteration on prompts/config, and easier debugging.
-
-## Quick Guide (5 minutes)
-
-### 1) Install
+### 1) Install dependencies
 
 ```bash
 uv sync
 ```
 
-### 2) Start local API + UI
+### 2) Install API/UI extras (recommended for local dev)
 
 ```bash
-# one-time setup
 uv run structured-search dev api-install
 uv run structured-search dev ui-install
+```
 
-# run both services
+### 3) Start API + UI
+
+```bash
 uv run structured-search dev all --reload
 ```
 
-### 3) Run a first prompt generation
+### 4) List tasks and capabilities
 
 ```bash
-uv run structured-search job-search prompt \
-  --profile profile_1 \
-  --step S3_execute
+uv run structured-search tasks list
 ```
 
-For further information about templates, check [docs/CONFIG_TASK.md](./docs/CONFIG_TASK.md).
+### 5) Run a `job_search` workflow
 
-For the full operational guide (end-to-end flows, JSONL run, GEN_CV, tools, API/UI mapping), use [docs/USAGE.md](./docs/USAGE.md).
+```bash
+uv run structured-search task job_search prompt \
+  --profile profile_1 \
+  --step S3_execute \
+  --output /tmp/job_search_prompt.md
 
-## UI Walkthrough
+uv run structured-search task job_search run \
+  --profile profile_1 \
+  --input examples/qa/data/valid_batch.jsonl \
+  --output /tmp/jobs_scored.jsonl
+```
 
-Screenshots below use sanitized/redacted sample data for documentation.
+### 6) Run `gen_cv` action
 
-### 1) Config tab
-![Config tab](./docs/resources/ui/01-config.png)
+```bash
+cat > /tmp/gen_cv_request.json << 'JSON'
+{
+  "profile_id": "profile_1",
+  "job": {
+    "id": "job-001",
+    "title": "Senior Backend Engineer",
+    "company": "Acme",
+    "stack": ["Python", "FastAPI"]
+  },
+  "candidate_profile": {
+    "id": "cand-1",
+    "name": "Jane Doe",
+    "seniority": "senior"
+  },
+  "allow_mock_fallback": true
+}
+JSON
 
-### 2) Prompt tab
-![Prompt tab](./docs/resources/ui/02-prompt.png)
+uv run structured-search task gen_cv action \
+  --name gen-cv \
+  --request /tmp/gen_cv_request.json
+```
 
-### 3) JSONL validation tab
-![JSONL validation tab](./docs/resources/ui/03-jsonl-validation.png)
+## API (v1)
 
-### 4) Results/scoring tab
-![Results tab](./docs/resources/ui/04-scoring.png)
+Task-scoped endpoints under `/v1`:
+- `GET /v1/tasks`
+- `GET /v1/tasks/{task_id}/profiles`
+- `GET|PUT /v1/tasks/{task_id}/profiles/{profile_id}/bundle`
+- `POST /v1/tasks/{task_id}/prompt/generate`
+- `POST /v1/tasks/{task_id}/jsonl/validate`
+- `POST /v1/tasks/{task_id}/run/validate`
+- `POST /v1/tasks/{task_id}/run`
+- `POST /v1/tasks/{task_id}/actions/gen-cv`
 
-### 5) CV generation tab
-![CV tab](./docs/resources/ui/05-cv-generation.png)
+Notes:
+- unsupported capabilities return `422` (for example, `/run` on `gen_cv`)
+- unknown task IDs return `404`
+- legacy endpoints (`/v1/job-search/*`, `/v1/gen-cv`) are removed
 
-## Documentation Map
+## Built-in Tasks
 
-- [docs/USAGE.md](./docs/USAGE.md): setup and day-to-day commands (CLI/API/UI).
-- [docs/CONFIG_TASK.md](./docs/CONFIG_TASK.md): detailed explanation of config templates and `bundle.json` mapping.
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md): architecture spec, boundaries, invariants, decisions.
-- [docs/API_CONTRACT_V1.md](./docs/API_CONTRACT_V1.md): HTTP contract details.
-- [docs/openapi_v1.json](./docs/openapi_v1.json): generated OpenAPI artifact.
-- [docs/TEST_SUITE_DESIGN.md](./docs/TEST_SUITE_DESIGN.md): test strategy and quality direction.
+| Task ID | Main capabilities |
+| --- | --- |
+| `job_search` | `prompt`, `jsonl_validate`, `run` |
+| `product_search` | `prompt`, `jsonl_validate`, `run` |
+| `gen_cv` | `action:gen-cv` |
 
-## Repository at a Glance
+## Documentation
+
+- [docs/USAGE.md](./docs/USAGE.md): setup and operational commands
+- [docs/API_CONTRACT_V1.md](./docs/API_CONTRACT_V1.md): HTTP contract
+- [docs/CONFIG_TASK.md](./docs/CONFIG_TASK.md): bundle/template semantics
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md): architecture and boundaries
+
+## Repository Layout
 
 ```text
 src/structured_search/
-  api/            # FastAPI delivery layer
-  application/    # use-case orchestration
-  contracts.py    # API/application DTOs
-  domain/         # pure models and invariants
-  infra/          # adapter implementations
-  ports/          # interfaces/contracts
-  tasks/          # task slices (job_search, gen_cv)
-  tools/          # utility commands
+  api/
+  application/
+    common/
+    core/
+      plugins/
+    gen_cv/
+  contracts.py
+  domain/
+    common/
+    job_search/
+    product_search/
+    gen_cv/
+  infra/
+  ports/
+  tools/
 
 config/
-  job_search/     # profile bundles + atoms
-  templates/      # config templates
+  job_search/
+  product_search/
+  gen_cv/
+  templates/
 
 resources/prompts/
   _base/
   job_search/
+  product_search/
   gen_cv/
 ```
 
