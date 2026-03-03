@@ -62,6 +62,25 @@ For further information about templates, check [docs/CONFIG_TASK.md](./docs/CONF
 
 For the full operational guide (end-to-end flows, JSONL run, GEN_CV, tools, API/UI mapping), use [docs/USAGE.md](./docs/USAGE.md).
 
+## UI Walkthrough
+
+Screenshots below use sanitized/redacted sample data for documentation.
+
+### 1) Config tab
+![Config tab](./docs/resources/ui/01-config.png)
+
+### 2) Prompt tab
+![Prompt tab](./docs/resources/ui/02-prompt.png)
+
+### 3) JSONL validation tab
+![JSONL validation tab](./docs/resources/ui/03-jsonl-validation.png)
+
+### 4) Results/scoring tab
+![Results tab](./docs/resources/ui/04-scoring.png)
+
+### 5) CV generation tab
+![CV tab](./docs/resources/ui/05-cv-generation.png)
+
 ## Documentation Map
 
 - [docs/USAGE.md](./docs/USAGE.md): setup and day-to-day commands (CLI/API/UI).

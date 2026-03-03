@@ -36,6 +36,23 @@ uv run structured-search dev ui --api-base http://127.0.0.1:8000/v1
 uv run structured-search dev all --port 8010 --ui-port 3001 --reload
 ```
 
+### 2.3 UI walkthrough (sanitized/redacted data)
+
+#### Config tab
+![Config tab](./resources/ui/01-config.png)
+
+#### Prompt tab
+![Prompt tab](./resources/ui/02-prompt.png)
+
+#### JSONL validation tab
+![JSONL validation tab](./resources/ui/03-jsonl-validation.png)
+
+#### Results/scoring tab
+![Results tab](./resources/ui/04-scoring.png)
+
+#### CV generation tab
+![CV tab](./resources/ui/05-cv-generation.png)
+
 ## 3) Profile Configuration
 
 Goal: define runtime behavior (`constraints`, `task`, `task_config`) per profile `config/job_search/<profile_id>/bundle.json`.
