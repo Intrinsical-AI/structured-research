@@ -18,9 +18,10 @@ from structured_search.ports.persistence import BundleData
 def _deps(tmp_path: Path) -> ApplicationDependencies:
     profile_repo = FilesystemProfileRepository(base_dir=tmp_path / "profiles")
     profile_repo.save_bundle(
+        "gen_cv",
         "profile_example",
         BundleData(
-            constraints={"domain": "job_search", "must": [], "prefer": [], "avoid": []},
+            constraints={"domain": "gen_cv", "must": [], "prefer": [], "avoid": []},
             task={
                 "gates": {
                     "hard_filters_mode": "require_all",
