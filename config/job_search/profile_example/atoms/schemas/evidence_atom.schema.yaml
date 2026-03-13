@@ -1,0 +1,25 @@
+type: object
+required:
+  - id
+  - type
+  - visibility
+  - is_placeholder
+  - url
+properties:
+  id:
+    type: string
+  type:
+    const: evidence
+  visibility:
+    type: string
+    enum: [public, private]
+  is_placeholder:
+    type: boolean
+  url:
+    type: string
+  published_at:
+    type: [string, "null"]
+  metadata:
+    type: object
+    additionalProperties: true
+additionalProperties: true

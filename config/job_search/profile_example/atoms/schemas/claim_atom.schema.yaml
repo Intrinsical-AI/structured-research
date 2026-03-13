@@ -1,0 +1,38 @@
+type: object
+required:
+  - id
+  - type
+  - parent_context_id
+  - defensibility
+properties:
+  id:
+    type: string
+  type:
+    const: claim
+  parent_context_id:
+    type: string
+  defensibility:
+    type: object
+    properties:
+      verification_level:
+        type: integer
+      evidence_ids:
+        type: array
+        items:
+          type: string
+      reproducibility_refs:
+        type: array
+        items:
+          type: string
+    additionalProperties: true
+  facets:
+    type: object
+    additionalProperties:
+      type: array
+      items:
+        type: string
+  variants:
+    type: object
+    additionalProperties:
+      type: string
+additionalProperties: true

@@ -1,4 +1,5 @@
 {
+    "task_id": "job_search",
     "profile_id": "profile_example",
     "constraints": {
         "domain": "job_search",
@@ -96,5 +97,7 @@
             "en",
             "es"
         ]
-    }
+    },
+    "domain_schema": null,
+    "result_schema": null
 }

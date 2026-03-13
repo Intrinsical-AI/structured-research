@@ -2,7 +2,8 @@ id: ev_1
 type: evidence
 visibility: public
 is_placeholder: false
-url: "https://example.com/portfolio/case-study-vllm"
+url: "https://portfolio.example.org/case-study-vllm"
+published_at: "2025-01-15"
 metadata:
   quote: "we achieved a 40% bump in speed"
   locator:

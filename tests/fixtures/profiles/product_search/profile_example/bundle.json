@@ -1,6 +1,6 @@
 {
   "task_id": "product_search",
-  "profile_id": "profile_default",
+  "profile_id": "profile_example",
   "constraints": {
     "domain": "product_search",
     "must": [],

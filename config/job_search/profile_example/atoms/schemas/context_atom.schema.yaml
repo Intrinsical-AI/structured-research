@@ -1,0 +1,20 @@
+type: object
+required:
+  - id
+  - type
+  - domain
+  - content
+properties:
+  id:
+    type: string
+  type:
+    const: context
+  domain:
+    type: string
+  tags:
+    type: array
+    items:
+      type: string
+  content:
+    type: string
+additionalProperties: true
