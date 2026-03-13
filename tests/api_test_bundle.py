@@ -378,7 +378,7 @@ def test_load_bundle_without_optional_schemas_keeps_none(tmp_path):
 
 
 @pytest.mark.integration
-def test_list_profiles_discovers_profile_example_and_profile_example():
+def test_list_profiles_discovers_profile_example():
     profiles = list_profiles(task_id=_TASK_ID)
     ids = {p["id"] for p in profiles}
     assert "profile_example" in ids

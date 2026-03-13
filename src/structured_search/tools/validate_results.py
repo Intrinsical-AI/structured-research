@@ -240,13 +240,16 @@ def read_records(file_path: Path):
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and validate results."""
-    parser = argparse.ArgumentParser(description="Validate and compile LLM extraction results")
+    parser = argparse.ArgumentParser(
+        description="Validate and compile LLM extraction results",
+        allow_abbrev=False,
+    )
     parser.add_argument("--input-dir", required=True, help="Input directory")
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument(
-        "--task",
+        "--task-id",
         default="job_search",
-        help="Task name (job_search, gen_cv, product_search)",
+        help="Task identifier (job_search, gen_cv, product_search)",
     )
     parser.add_argument(
         "--strict",
@@ -259,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     return validate_results(
         args.input_dir,
         args.output_dir,
-        args.task,
+        args.task_id,
         args.strict,
     )
 

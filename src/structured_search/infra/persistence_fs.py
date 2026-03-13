@@ -123,12 +123,8 @@ class FilesystemProfileRepository(ProfileRepository):
     def load_bundle(
         self,
         task_id: str,
-        profile_id: str | None = None,
+        profile_id: str,
     ) -> BundleData:
-        # Compatibility mode: load_bundle(profile_id)
-        if profile_id is None:
-            profile_id = task_id
-            task_id = "job_search"
         bundle_path = self._bundle_path(task_id, profile_id)
         if not bundle_path.is_file():
             raise FileNotFoundError(
@@ -141,22 +137,12 @@ class FilesystemProfileRepository(ProfileRepository):
     def save_bundle(
         self,
         task_id: str,
-        profile_id: str | BundleData,
-        bundle: BundleData | None = None,
+        profile_id: str,
+        bundle: BundleData,
     ) -> None:
-        # Compatibility mode: save_bundle(profile_id, bundle)
-        if bundle is None and isinstance(profile_id, BundleData):
-            bundle = profile_id
-            profile_id = task_id
-            task_id = "job_search"
-        if bundle is None:
-            raise TypeError("save_bundle() missing required bundle argument")
-        if isinstance(profile_id, BundleData):
-            raise TypeError("save_bundle() profile_id must be a string")
-        resolved_profile_id = profile_id
         payload = {
             "task_id": task_id,
-            "profile_id": resolved_profile_id,
+            "profile_id": profile_id,
             "constraints": bundle.constraints,
             "task": bundle.task,
             "task_config": bundle.task_config,
@@ -164,13 +150,9 @@ class FilesystemProfileRepository(ProfileRepository):
             "domain_schema": bundle.domain_schema,
             "result_schema": bundle.result_schema,
         }
-        _write_json(self._bundle_path(task_id, resolved_profile_id), payload)
+        _write_json(self._bundle_path(task_id, profile_id), payload)
 
-    def atoms_dir(self, task_id: str, profile_id: str | None = None) -> Path:
-        # Compatibility mode: atoms_dir(profile_id)
-        if profile_id is None:
-            profile_id = task_id
-            task_id = "job_search"
+    def atoms_dir(self, task_id: str, profile_id: str) -> Path:
         safe_task = self._validate_slug("task_id", task_id)
         safe_profile = self._validate_slug("profile_id", profile_id)
         return self.base_dir / safe_task / safe_profile / "atoms"

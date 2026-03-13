@@ -1,19 +1,19 @@
-"""Scaffold a new task with full directory structure."""
+"""Scaffold a new task with the canonical config/ layout."""
 
 import argparse
 import json
 from pathlib import Path
 
 
-def scaffold_task(task_name: str) -> int:
+def scaffold_task(task_id: str) -> int:
     """Generate directory structure for a new task.
 
     Creates:
-    - resources/prompts/{task_name}/ (context + steps)
-    - config/{task_name}/profile_default/ (bundle.json + atoms)
+    - resources/prompts/{task_id}/ (context + steps)
+    - config/{task_id}/profile_default/ (bundle.json + atoms)
 
     Args:
-        task_name: Task name (e.g., 'candidate_search')
+        task_id: Task identifier (e.g., 'candidate_search')
 
     Returns:
         0 on success, 1 on error
@@ -21,16 +21,16 @@ def scaffold_task(task_name: str) -> int:
     repo_root = Path(__file__).parent.parent
 
     # 1. Create prompts directory
-    prompts_dir = repo_root / "resources" / "prompts" / task_name
+    prompts_dir = repo_root / "resources" / "prompts" / task_id
     prompts_dir.mkdir(parents=True, exist_ok=True)
 
     # Create context.md
     context_path = prompts_dir / "context.md"
     context_path.write_text(
-        f"""# {task_name.upper()} Context
+        f"""# {task_id.upper()} Context
 
 ## Overview
-[TODO: Add overview of the {task_name} task]
+[TODO: Add overview of the {task_id} task]
 
 ## Key Concepts
 [TODO: List key concepts and definitions]
@@ -55,14 +55,14 @@ def scaffold_task(task_name: str) -> int:
         (steps_dir / step_name).write_text(content)
 
     # 2. Create config directory
-    config_dir = repo_root / "config" / task_name / "profile_default"
+    config_dir = repo_root / "config" / task_id / "profile_default"
     config_dir.mkdir(parents=True, exist_ok=True)
 
     bundle = {
-        "task_id": task_name,
+        "task_id": task_id,
         "profile_id": "profile_default",
         "constraints": {
-            "domain": task_name,
+            "domain": task_id,
             "sources": {"primary": [], "secondary": [], "fallback": []},
             "must": [],
             "prefer": [],
@@ -101,7 +101,7 @@ def scaffold_task(task_name: str) -> int:
         },
         "domain_schema": None,
         "result_schema": {
-            "title": f"{task_name}_result",
+            "title": f"{task_id}_result",
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
@@ -135,21 +135,21 @@ def scaffold_task(task_name: str) -> int:
     projects_dir = config_dir / "projects"
     projects_dir.mkdir(exist_ok=True)
 
-    print(f"✓ Task '{task_name}' scaffolded successfully!\n")
+    print(f"✓ Task '{task_id}' scaffolded successfully!\n")
     print("Created:")
-    print(f"  📁 resources/prompts/{task_name}/")
+    print(f"  📁 resources/prompts/{task_id}/")
     print("     ├── context.md")
     print("     └── steps/ (S0, S1, S2, S3)")
-    print(f"\n  📁 config/{task_name}/")
+    print(f"\n  📁 config/{task_id}/")
     print("     └── profile_default/")
     print("         ├── bundle.json")
     print("         ├── atoms/ (context, claims, evidence, schemas, canon_tags.yaml)")
     print("         └── projects/")
     print("\nNext steps:")
-    print(f"  1. Edit resources/prompts/{task_name}/context.md")
-    print(f"  2. Edit resources/prompts/{task_name}/steps/*.md")
-    print(f"  3. Edit config/{task_name}/profile_default/bundle.json")
-    print(f"  4. Create models in src/structured_search/domain/{task_name}/models.py")
+    print(f"  1. Edit resources/prompts/{task_id}/context.md")
+    print(f"  2. Edit resources/prompts/{task_id}/steps/*.md")
+    print(f"  3. Edit config/{task_id}/profile_default/bundle.json")
+    print(f"  4. Create models in src/structured_search/domain/{task_id}/models.py")
     print("  5. Register plugin in src/structured_search/application/core/plugins/")
 
     return 0
@@ -159,14 +159,14 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and scaffold task."""
     parser = argparse.ArgumentParser(description="Scaffold a new task with directory structure")
     parser.add_argument(
-        "--name",
+        "--task-id",
         required=True,
-        help="Task name (e.g., 'candidate_search')",
+        help="Task identifier (e.g., 'candidate_search')",
     )
 
     args = parser.parse_args(argv)
 
-    return scaffold_task(args.name)
+    return scaffold_task(args.task_id)
 
 
 if __name__ == "__main__":

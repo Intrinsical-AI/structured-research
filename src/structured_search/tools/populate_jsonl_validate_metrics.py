@@ -13,7 +13,7 @@ DEFAULT_GLOB = "results/job_search/**/results.jsonl"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument(
         "--api-base",
         default="http://127.0.0.1:8000/v1",

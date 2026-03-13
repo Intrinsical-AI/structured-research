@@ -34,6 +34,12 @@ DEFAULT_API_PORT = 8000
 DEFAULT_UI_PORT = 3000
 
 
+class NoAbbrevArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+
 def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> int:
     completed = subprocess.run(cmd, cwd=cwd, env=env, check=False)
     return int(completed.returncode)
@@ -142,7 +148,7 @@ def _cmd_task_prompt(args: argparse.Namespace) -> int:
     try:
         result = generate_prompt(
             task_id=args.task_id,
-            profile_id=args.profile,
+            profile_id=args.profile_id,
             step=args.step,
             plugin=plugin,
         )
@@ -175,7 +181,7 @@ def _cmd_task_run(args: argparse.Namespace) -> int:
     ingest = ingest_validate_jsonl(raw_text=raw_text, record_model=plugin.record_model)
 
     request = RunScoreRequest(
-        profile_id=args.profile,
+        profile_id=args.profile_id,
         records=ingest.valid,
         require_snapshot=args.require_snapshot,
     )
@@ -236,7 +242,7 @@ def _cmd_task_run_validate(args: argparse.Namespace) -> int:
             return 1
         request = _load_run_request_from_input(
             plugin=plugin,
-            profile_id=args.profile,
+            profile_id=args.profile_id,
             input_path=input_path,
             require_snapshot=args.require_snapshot,
         )
@@ -255,7 +261,7 @@ def _cmd_task_run_validate(args: argparse.Namespace) -> int:
 
 def _cmd_task_action(args: argparse.Namespace) -> int:
     plugin = _plugin_or_exit(args.task_id)
-    action_name = args.name
+    action_name = args.action_name
     if not plugin.supports(f"action:{action_name}"):
         print(
             f"Task {args.task_id!r} does not support action {action_name!r}",
@@ -427,7 +433,14 @@ def _cmd_clean(_args: argparse.Namespace) -> int:
 
 
 def _cmd_tools_validate_results(args: argparse.Namespace) -> int:
-    argv = ["--input-dir", args.input_dir, "--output-dir", args.output_dir, "--task", args.task]
+    argv = [
+        "--input-dir",
+        args.input_dir,
+        "--output-dir",
+        args.output_dir,
+        "--task-id",
+        args.task_id,
+    ]
     if args.strict:
         argv.append("--strict")
     return validate_results.main(argv)
@@ -447,7 +460,7 @@ def _cmd_tools_validate_atoms(args: argparse.Namespace) -> int:
 
 
 def _cmd_tools_scaffold_task(args: argparse.Namespace) -> int:
-    return scaffold_task.main(["--name", args.name])
+    return scaffold_task.main(["--task-id", args.task_id])
 
 
 def _cmd_tools_extract_p2(args: argparse.Namespace) -> int:
@@ -463,11 +476,14 @@ def _cmd_tools_export_ui_types(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="structured-search")
-    subparsers = parser.add_subparsers(dest="group")
+    parser = argparse.ArgumentParser(prog="structured-search", allow_abbrev=False)
+    subparsers = parser.add_subparsers(dest="group", parser_class=NoAbbrevArgumentParser)
 
     quality = subparsers.add_parser("quality", help="Lint, format, test and architecture checks")
-    quality_sub = quality.add_subparsers(dest="quality_cmd")
+    quality_sub = quality.add_subparsers(
+        dest="quality_cmd",
+        parser_class=NoAbbrevArgumentParser,
+    )
     quality_lint = quality_sub.add_parser("lint", help="ruff check + format check")
     quality_lint.set_defaults(func=_cmd_quality_lint)
     quality_format = quality_sub.add_parser("format", help="ruff format + ruff --fix")
@@ -479,7 +495,10 @@ def build_parser() -> argparse.ArgumentParser:
     quality_arch.set_defaults(func=_cmd_quality_arch_lint)
 
     metrics = subparsers.add_parser("metrics", help="Q2 metrics reporting and population")
-    metrics_sub = metrics.add_subparsers(dest="metrics_cmd")
+    metrics_sub = metrics.add_subparsers(
+        dest="metrics_cmd",
+        parser_class=NoAbbrevArgumentParser,
+    )
     metrics_report = metrics_sub.add_parser("report", help="Compute Q2 report from metric events")
     metrics_report.add_argument("--metrics-log", default="runs/metrics_q2_events.jsonl")
     metrics_report.add_argument("--days", type=int, default=7)
@@ -503,22 +522,36 @@ def build_parser() -> argparse.ArgumentParser:
     metrics_populate.set_defaults(func=_cmd_metrics_populate)
 
     tasks_parser = subparsers.add_parser("tasks", help="Task registry operations")
-    tasks_sub = tasks_parser.add_subparsers(dest="tasks_cmd")
+    tasks_sub = tasks_parser.add_subparsers(
+        dest="tasks_cmd",
+        parser_class=NoAbbrevArgumentParser,
+    )
     tasks_list = tasks_sub.add_parser("list", help="List registered tasks")
     tasks_list.set_defaults(func=_cmd_tasks_list)
 
     task = subparsers.add_parser("task", help="Execute one task workflow")
     task.add_argument("task_id", help="Task identifier (e.g., job_search, product_search, gen_cv)")
-    task_sub = task.add_subparsers(dest="task_cmd")
+    task_sub = task.add_subparsers(
+        dest="task_cmd",
+        parser_class=NoAbbrevArgumentParser,
+    )
 
     task_prompt = task_sub.add_parser("prompt", help="Compose extraction prompt")
-    task_prompt.add_argument("--profile", required=True)
+    task_prompt.add_argument(
+        "--profile-id",
+        required=True,
+        help="Profile identifier (e.g., profile_example)",
+    )
     task_prompt.add_argument("--step", default="S3_execute")
     task_prompt.add_argument("--output", default=None)
     task_prompt.set_defaults(func=_cmd_task_prompt)
 
     task_run = task_sub.add_parser("run", help="Run deterministic scoring on JSONL input")
-    task_run.add_argument("--profile", required=True)
+    task_run.add_argument(
+        "--profile-id",
+        required=True,
+        help="Profile identifier (e.g., profile_example)",
+    )
     task_run.add_argument("--input", dest="input_path", required=True)
     task_run.add_argument("--output", dest="output_path", required=True)
     task_run.add_argument("--require-snapshot", action="store_true")
@@ -529,7 +562,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--request", default=None, help="JSON file with RunScoreRequest payload"
     )
     task_validate.add_argument(
-        "--profile", default="profile_example", help="Used when --request is omitted"
+        "--profile-id",
+        default="profile_example",
+        help="Profile identifier used when --request is omitted",
     )
     task_validate.add_argument(
         "--input", dest="input_path", default=None, help="Used when --request is omitted"
@@ -544,12 +579,16 @@ def build_parser() -> argparse.ArgumentParser:
     task_validate.set_defaults(func=_cmd_task_run_validate, fail_on_not_ok=True)
 
     task_action = task_sub.add_parser("action", help="Execute a task action handler")
-    task_action.add_argument("--name", required=True, help="Action name (e.g., gen-cv)")
+    task_action.add_argument(
+        "--action-name",
+        required=True,
+        help="Action name (e.g., gen-cv)",
+    )
     task_action.add_argument("--request", required=True, help="JSON request payload file")
     task_action.set_defaults(func=_cmd_task_action)
 
     api = subparsers.add_parser("api", help="HTTP API operations")
-    api_sub = api.add_subparsers(dest="api_cmd")
+    api_sub = api.add_subparsers(dest="api_cmd", parser_class=NoAbbrevArgumentParser)
     api_serve = api_sub.add_parser("serve", help="Run FastAPI server with uvicorn")
     api_serve.add_argument("--host", default=DEFAULT_API_HOST)
     api_serve.add_argument("--port", type=int, default=DEFAULT_API_PORT)
@@ -557,7 +596,7 @@ def build_parser() -> argparse.ArgumentParser:
     api_serve.set_defaults(func=_cmd_api_serve)
 
     dev = subparsers.add_parser("dev", help="Local developer workflows")
-    dev_sub = dev.add_subparsers(dest="dev_cmd")
+    dev_sub = dev.add_subparsers(dest="dev_cmd", parser_class=NoAbbrevArgumentParser)
     dev_api_install = dev_sub.add_parser("api-install", help="Install API extras with uv")
     dev_api_install.add_argument("--uv-cache-dir", default="/tmp/uv_cache")
     dev_api_install.set_defaults(func=_cmd_dev_api_install)
@@ -591,11 +630,15 @@ def build_parser() -> argparse.ArgumentParser:
     clean.set_defaults(func=_cmd_clean)
 
     tools = subparsers.add_parser("tools", help="Utility workflows")
-    tools_sub = tools.add_subparsers(dest="tools_cmd")
+    tools_sub = tools.add_subparsers(dest="tools_cmd", parser_class=NoAbbrevArgumentParser)
     tools_validate_results = tools_sub.add_parser("validate-results")
     tools_validate_results.add_argument("--input-dir", required=True)
     tools_validate_results.add_argument("--output-dir", required=True)
-    tools_validate_results.add_argument("--task", default="job_search")
+    tools_validate_results.add_argument(
+        "--task-id",
+        default="job_search",
+        help="Task identifier (job_search, product_search, gen_cv)",
+    )
     tools_validate_results.add_argument("--strict", action="store_true")
     tools_validate_results.set_defaults(func=_cmd_tools_validate_results)
 
@@ -612,7 +655,9 @@ def build_parser() -> argparse.ArgumentParser:
     tools_validate_atoms.set_defaults(func=_cmd_tools_validate_atoms)
 
     tools_scaffold_task = tools_sub.add_parser("scaffold-task")
-    tools_scaffold_task.add_argument("--name", required=True)
+    tools_scaffold_task.add_argument(
+        "--task-id", required=True, help="Task identifier to scaffold"
+    )
     tools_scaffold_task.set_defaults(func=_cmd_tools_scaffold_task)
 
     tools_extract_p2 = tools_sub.add_parser("extract-p2-postings")

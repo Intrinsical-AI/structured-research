@@ -26,6 +26,30 @@ def test_parser_accepts_task_run_validate_command():
     assert callable(args.func)
 
 
+def test_parser_accepts_task_prompt_profile_id_flag():
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        [
+            "task",
+            "job_search",
+            "prompt",
+            "--profile-id",
+            "profile_example",
+        ]
+    )
+    assert args.profile_id == "profile_example"
+
+
+def test_parser_rejects_legacy_profile_flag():
+    parser = cli.build_parser()
+    try:
+        parser.parse_args(["task", "job_search", "prompt", "--profile", "profile_example"])
+    except SystemExit as exc:
+        assert exc.code != 0
+    else:
+        raise AssertionError("legacy --profile flag should be rejected")
+
+
 def test_run_validate_returns_2_when_ok_false_and_fail_enabled(tmp_path: Path, monkeypatch):
     request_file = tmp_path / "request.json"
     request_file.write_text(
@@ -96,12 +120,65 @@ def test_parser_accepts_tasks_list_command():
 def test_parser_accepts_task_action_command():
     parser = cli.build_parser()
     args = parser.parse_args(
-        ["task", "gen_cv", "action", "--name", "gen-cv", "--request", "req.json"]
+        ["task", "gen_cv", "action", "--action-name", "gen-cv", "--request", "req.json"]
     )
     assert args.group == "task"
     assert args.task_id == "gen_cv"
     assert args.task_cmd == "action"
     assert callable(args.func)
+
+
+def test_parser_rejects_legacy_action_flag():
+    parser = cli.build_parser()
+    try:
+        parser.parse_args(
+            ["task", "gen_cv", "action", "--name", "gen-cv", "--request", "req.json"]
+        )
+    except SystemExit as exc:
+        assert exc.code != 0
+    else:
+        raise AssertionError("legacy --name flag should be rejected")
+
+
+def test_parser_accepts_tools_flags_with_standardized_ids():
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        [
+            "tools",
+            "validate-results",
+            "--input-dir",
+            "in",
+            "--output-dir",
+            "out",
+            "--task-id",
+            "job_search",
+        ]
+    )
+    assert args.task_id == "job_search"
+
+    args = parser.parse_args(["tools", "scaffold-task", "--task-id", "candidate_search"])
+    assert args.task_id == "candidate_search"
+
+
+def test_parser_rejects_legacy_tools_task_flag():
+    parser = cli.build_parser()
+    try:
+        parser.parse_args(
+            [
+                "tools",
+                "validate-results",
+                "--input-dir",
+                "in",
+                "--output-dir",
+                "out",
+                "--task",
+                "job_search",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code != 0
+    else:
+        raise AssertionError("legacy --task flag should be rejected")
 
 
 def test_tools_export_openapi_dispatches_to_module(monkeypatch):
