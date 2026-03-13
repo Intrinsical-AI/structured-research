@@ -20,7 +20,8 @@ from pathlib import Path
 # ── Paths ───────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[3]  # repo root
 QA_DATA = ROOT / "examples" / "qa" / "data"
-EXAMPLES = ROOT / "examples" / "job_search" / "profile_example"
+EXAMPLE_PAYLOADS = ROOT / "examples" / "job_search" / "profile_example"
+CONFIG_PROFILES = ROOT / "config" / "job_search" / "profile_example"
 
 
 # ── Mini test harness ────────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ def http(method: str, url: str, body: dict | None = None) -> tuple[int, dict]:
     except urllib.error.URLError as exc:
         print(f"\nERROR: Cannot reach API at {url}")
         print(f"       {exc.reason}")
-        print("       Start the API with: make api  or  PROFILES_BASE=examples make api")
+        print("       Start the API with: uv run structured-search dev api --reload")
         sys.exit(2)
 
 
@@ -334,7 +335,7 @@ def run_t04(base: str) -> None:
     check("T04.3 path traversal → 404 (not 200/500)", status == 404, f"got {status}")
 
     # T04.4 Profile ID override: URL takes precedence over body
-    bundle = load_json(ROOT / "examples" / "job_search" / "profile_example" / "bundle.json")
+    bundle = load_json(CONFIG_PROFILES / "bundle.json")
     bundle["profile_id"] = "wrong_id_in_body"
     status, body = http(
         "PUT", f"{base}/v1/tasks/job_search/profiles/qa_id_override/bundle", bundle
@@ -413,9 +414,9 @@ def run_t05(base: str) -> None:
     )
 
     # T05.6 gen-cv with mock fallback (no Ollama needed)
-    if (EXAMPLES / "job.json").exists() and (EXAMPLES / "candidate.json").exists():
-        job = load_json(EXAMPLES / "job.json")
-        candidate = load_json(EXAMPLES / "candidate.json")
+    if (EXAMPLE_PAYLOADS / "job.json").exists() and (EXAMPLE_PAYLOADS / "candidate.json").exists():
+        job = load_json(EXAMPLE_PAYLOADS / "job.json")
+        candidate = load_json(EXAMPLE_PAYLOADS / "candidate.json")
         status, body = http(
             "POST",
             f"{base}/v1/tasks/gen_cv/actions/gen-cv",
@@ -434,9 +435,9 @@ def run_t05(base: str) -> None:
         )
 
     # T05.7 gen-cv without mock (expect 503 if no Ollama)
-    if (EXAMPLES / "job.json").exists() and (EXAMPLES / "candidate.json").exists():
-        job = load_json(EXAMPLES / "job.json")
-        candidate = load_json(EXAMPLES / "candidate.json")
+    if (EXAMPLE_PAYLOADS / "job.json").exists() and (EXAMPLE_PAYLOADS / "candidate.json").exists():
+        job = load_json(EXAMPLE_PAYLOADS / "job.json")
+        candidate = load_json(EXAMPLE_PAYLOADS / "candidate.json")
         status, body = http(
             "POST",
             f"{base}/v1/tasks/gen_cv/actions/gen-cv",

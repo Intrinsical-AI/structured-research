@@ -1,0 +1,49 @@
+{
+  "profile_id": "profile_example",
+  "job": {
+    "id": "job_111",
+    "title": "Senior AI Backend Engineer",
+    "company": "DeepData AI",
+    "stack": ["Python", "FastAPI", "PostgreSQL", "LLMs"],
+    "seniority": "senior",
+    "modality": "remote",
+    "location": "Global",
+    "description": "We are looking for an experienced engineer to scale our AI inference layer.",
+    "url": "https://deepdata.example.com/careers/senior-ai-backend",
+    "extra": {
+      "source": "example",
+      "domain_tags": ["AI", "Backend"],
+      "salary_eur_gross": 95000
+    }
+  },
+  "candidate_profile": {
+    "id": "cand_123",
+    "name": "Jane Example Doe",
+    "seniority": "senior",
+    "tech_stack": {
+      "languages": ["Python", "TypeScript", "Go"],
+      "frameworks": ["FastAPI", "React", "Next.js"],
+      "platforms": ["AWS", "Vercel"],
+      "domains": ["AI Engineering", "Backend", "Fullstack"]
+    },
+    "experience": [
+      {
+        "company": "Acme Corp",
+        "title": "Senior AI Engineer",
+        "duration_months": 36,
+        "highlights": [
+          "Architected scalable LLM inference pipelines processing 1M tokens/day",
+          "Reduced latency by 40% through vLLM integration"
+        ],
+        "stack": ["Python", "FastAPI", "Ollama"]
+      }
+    ],
+    "education": ["BSc Computer Science, Example University"],
+    "spoken_languages": ["English", "Spanish"],
+    "location": "Madrid, Spain",
+    "timezone": "Europe/Madrid",
+    "availability_days": 15,
+    "role_focus": ["AI Engineer", "Senior Backend Engineer"]
+  },
+  "allow_mock_fallback": true
+}

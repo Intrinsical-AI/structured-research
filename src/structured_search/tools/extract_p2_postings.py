@@ -158,21 +158,21 @@ def extract(input_path: Path, output_dir: Path) -> int:
     print(f"  Errors    : {parse_errors} unparseable lines")
     print()
     print("Next steps:")
-    print("  1. Fill in config/job_search/profile_example/candidate.json with real candidate data")
+    print("  1. Review examples/job_search/profile_example/candidate.json and adapt it as needed")
     print("  2. Build a gen_cv request per posting and execute task action:")
     print(f"     for f in {output_dir}/*.json; do")
     print("       python3 - <<'PY' \"$f\" > /tmp/gen_cv_request.json")
     print("import json,sys")
     print("job=json.load(open(sys.argv[1], encoding='utf-8'))")
     print(
-        "candidate=json.load(open('config/job_search/profile_example/candidate.json', encoding='utf-8'))"
+        "candidate=json.load(open('examples/job_search/profile_example/candidate.json', encoding='utf-8'))"
     )
     print(
         "json.dump({'profile_id':'profile_example','job':job,'candidate_profile':candidate}, sys.stdout)"
     )
     print("PY")
     print(
-        "       uv run structured-search task gen_cv action --name gen-cv --request /tmp/gen_cv_request.json \\"
+        "       uv run structured-search task gen_cv action --action-name gen-cv --request /tmp/gen_cv_request.json \\"
     )
     print("         > results/gen_cv/profile_example/$(basename $f)")
     print("     done")

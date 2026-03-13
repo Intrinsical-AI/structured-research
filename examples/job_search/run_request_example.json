@@ -1,0 +1,36 @@
+{
+  "profile_id": "profile_example",
+  "records": [
+    {
+      "id": "QA-V01",
+      "source": "linkedin",
+      "title": "Senior Python Backend Engineer",
+      "company": "Acme Corp",
+      "stack": ["python", "typescript", "react", "fastapi", "postgresql"],
+      "modality": "remote",
+      "seniority": {"level": "senior"},
+      "location": "Remote, EU",
+      "description": "Senior Python backend role with TypeScript frontend.",
+      "url": "https://linkedin.com/jobs/qa-v01",
+      "apply_url": "https://acme.com/apply/001",
+      "geo": {"region": "EU", "city": null, "country": "Spain"},
+      "economics": {"salary_eur_gross": 80000.0, "period": "annual"},
+      "evidence": [
+        {
+          "id": "ev-001",
+          "field": "apply_url",
+          "quote": "Apply on our careers page",
+          "url": "https://linkedin.com/jobs/qa-v01",
+          "retrieved_at": "2024-01-15T10:00:00",
+          "locator": {"type": "css_selector", "value": ".apply-btn"},
+          "source_kind": "html",
+          "is_external_instruction": false
+        }
+      ],
+      "anomalies": [],
+      "inferences": [],
+      "incomplete": false
+    }
+  ],
+  "require_snapshot": false
+}

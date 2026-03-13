@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # QA Smoke Test — structured-research
 # Tests core CLI flows without requiring a running API.
-# Usage: bash examples/qa/scripts/smoke.sh [--profiles-base PATH]
+# Usage: bash examples/qa/scripts/smoke.sh [PROFILES_BASE_PATH]
 set -euo pipefail
 
-PROFILES_BASE="${1:-examples}"
+PROFILES_BASE="${1:-config}"
+UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv_cache}"
 PASS=0; FAIL=0
 
 pass() { echo "  PASS $1"; ((PASS++)); return 0; }
@@ -16,23 +17,23 @@ require_cmd uv
 require_cmd python3
 
 CLI="uv run structured-search"
-ENV_PREFIX="PROFILES_BASE=$PROFILES_BASE"
+ENV_PREFIX="PROFILES_BASE=$PROFILES_BASE UV_CACHE_DIR=$UV_CACHE_DIR"
 
-echo "=== QA Smoke Tests (PROFILES_BASE=$PROFILES_BASE) ==="
+echo "=== QA Smoke Tests (PROFILES_BASE=$PROFILES_BASE, UV_CACHE_DIR=$UV_CACHE_DIR) ==="
 echo ""
 
 # ── T01: Prompt generation ──────────────────────────────────────────────────
 echo "── T01: Prompt Generation ──"
 
 OUT=$(eval "$ENV_PREFIX $CLI task job_search prompt \
-  --profile profile_example --step S3_execute 2>&1") && \
+  --profile-id profile_example --step S3_execute 2>&1") && \
   echo "$OUT" | grep -q "Search Constraints" && \
   pass "T01.1 prompt rendered with constraints" || \
   fail "T01.1 prompt generation" "output: ${OUT:0:200}"
 
 set +e
 OUT2=$(eval "$ENV_PREFIX $CLI task job_search prompt \
-  --profile does_not_exist_xyz --step S3_execute 2>&1")
+  --profile-id does_not_exist_xyz --step S3_execute 2>&1")
 RC=$?
 set -e
 [[ $RC -ne 0 ]] && pass "T01.2 unknown profile exits non-zero" || \
@@ -46,7 +47,7 @@ echo "── T02: Scoring Run (valid_batch.jsonl) ──"
 OUT_SCORED=$(mktemp /tmp/qa_scored_XXXXX.jsonl)
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile profile_example \
+  --profile-id profile_example \
   --input examples/qa/data/valid_batch.jsonl \
   --output $OUT_SCORED 2>&1" >/dev/null && \
   pass "T02.1 run command exits 0" || \
@@ -91,7 +92,7 @@ echo "── T03: Score Clamping (qa_weighted) ──"
 OUT_W=$(mktemp /tmp/qa_weighted_XXXXX.jsonl)
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile qa_weighted \
+  --profile-id qa_weighted \
   --input examples/qa/data/edge_cases.jsonl \
   --output $OUT_W 2>&1" >/dev/null && \
   pass "T03.1 qa_weighted run exits 0" || \
@@ -116,7 +117,7 @@ echo "── T04: Score Clamping (qa_open) ──"
 OUT_O=$(mktemp /tmp/qa_open_XXXXX.jsonl)
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile qa_open \
+  --profile-id qa_open \
   --input examples/qa/data/edge_cases.jsonl \
   --output $OUT_O 2>&1" >/dev/null && \
   pass "T04.1 qa_open run exits 0" || \
@@ -141,7 +142,7 @@ echo "── T05: require_any gates (qa_require_any) ──"
 OUT_RA=$(mktemp /tmp/qa_rany_XXXXX.jsonl)
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile qa_require_any \
+  --profile-id qa_require_any \
   --input examples/qa/data/edge_cases.jsonl \
   --output $OUT_RA 2>&1" >/dev/null && \
   pass "T05.1 qa_require_any run exits 0" || \
@@ -178,7 +179,7 @@ echo "── T06: neutral_if_na (qa_neutral_na) ──"
 OUT_NA=$(mktemp /tmp/qa_nna_XXXXX.jsonl)
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile qa_neutral_na \
+  --profile-id qa_neutral_na \
   --input examples/qa/data/edge_cases.jsonl \
   --output $OUT_NA 2>&1" >/dev/null && \
   pass "T06.1 qa_neutral_na run exits 0" || \
@@ -201,14 +202,14 @@ echo ""
 echo "── T07: CLI Error Paths ──"
 
 eval "$ENV_PREFIX $CLI task job_search run \
-  --profile profile_example \
+  --profile-id profile_example \
   --input /tmp/this_file_does_not_exist_qa.jsonl \
   --output /tmp/qa_out.jsonl 2>&1" && \
   fail "T07.1 missing input" "expected non-zero exit" || \
   pass "T07.1 missing input file exits non-zero"
 
 eval "$ENV_PREFIX $CLI task job_search prompt \
-  --profile profile_example --step INVALID_STEP_XYZ 2>&1" && \
+  --profile-id profile_example --step INVALID_STEP_XYZ 2>&1" && \
   fail "T07.2 invalid step" "expected non-zero exit" || \
   pass "T07.2 invalid step exits non-zero"
 
