@@ -6,8 +6,8 @@ Operational guide for task-scoped `structured-search`.
 
 - Python `>=3.12`
 - `uv`
-- Node.js + `npm` (for UI)
-- Optional: local Ollama (for real `gen_cv` generation without fallback)
+- Node.js + `npm` for the UI
+- Optional: local Ollama for real `gen_cv` generation without fallback
 
 ## 2) Setup
 
@@ -17,135 +17,76 @@ uv run structured-search dev api-install
 uv run structured-search dev ui-install
 ```
 
-## 3) Run API + UI
+## 3) Runtime Profiles
 
-```bash
-uv run structured-search dev all --reload
-```
+- Canonical runtime profiles live in `config/{task_id}/{profile_id}/bundle.json`.
+- Built-in demo profiles use `profile_example`.
+- `examples/` only contains reusable payloads, datasets and QA scripts.
+- `PROFILES_BASE` can still override the profile root when needed.
 
-Useful variants:
-
-```bash
-uv run structured-search dev api --reload
-uv run structured-search dev ui --api-base http://127.0.0.1:8000/v1
-```
-
-## 4) Discover tasks
+## 4) Discover Tasks
 
 ```bash
 uv run structured-search tasks list
 ```
 
-Current built-in tasks:
-- `job_search` (`prompt`, `jsonl_validate`, `run`)
-- `product_search` (`prompt`, `jsonl_validate`, `run`)
-- `gen_cv` (`action:gen-cv`)
+## 5) Task Workflows
 
-## 5) Profiles and configuration
-
-Profiles are loaded from:
-- `config/{task_id}/{profile_id}/bundle.json`
-
-You can override the base directory with:
-
-```bash
-export PROFILES_BASE=examples
-```
-
-## 6) Task workflows
-
-### 6.1 Job search: prompt generation
+### 5.1 Job search prompt generation
 
 ```bash
 uv run structured-search task job_search prompt \
-  --profile profile_1 \
+  --profile-id profile_example \
   --step S3_execute \
   --output /tmp/job_search_prompt.md
 ```
 
-### 6.2 Job search: deterministic run
+### 5.2 Job search deterministic run
 
 ```bash
 uv run structured-search task job_search run \
-  --profile profile_1 \
+  --profile-id profile_example \
   --input examples/qa/data/valid_batch.jsonl \
   --output /tmp/jobs_scored.jsonl
 ```
 
-### 6.3 Job search: dry-run validation (`/run/validate` equivalent)
-
-Using full request payload:
+### 5.3 Job search dry-run validation
 
 ```bash
-cat > /tmp/run_request.json << 'JSON'
-{
-  "profile_id": "profile_1",
-  "records": [
-    {
-      "id": "QA-V01",
-      "source": "linkedin",
-      "title": "Senior Python Backend Engineer",
-      "company": "Acme Corp",
-      "stack": ["python", "typescript"],
-      "modality": "remote",
-      "seniority": {"level": "senior"},
-      "apply_url": "https://acme.com/apply/001",
-      "geo": {"region": "EU"},
-      "evidence": [],
-      "facts": [],
-      "inferences": [],
-      "anomalies": [],
-      "incomplete": false
-    }
-  ],
-  "require_snapshot": false
-}
-JSON
-
 uv run structured-search task job_search run-validate \
-  --request /tmp/run_request.json
+  --request examples/job_search/run_request_example.json
 ```
 
-### 6.4 Product search: prompt + run
+### 5.4 Product search prompt + run
 
 ```bash
 uv run structured-search task product_search prompt \
-  --profile profile_default \
+  --profile-id profile_example \
   --step S3_execute
 
 uv run structured-search task product_search run \
-  --profile profile_default \
-  --input <your_product_records.jsonl> \
+  --profile-id profile_example \
+  --input <product_records.jsonl> \
   --output /tmp/products_scored.jsonl
 ```
 
-### 6.5 GEN_CV action
+### 5.5 GEN_CV action
 
 ```bash
-cat > /tmp/gen_cv_request.json << 'JSON'
-{
-  "profile_id": "profile_1",
-  "job": {
-    "id": "job-001",
-    "title": "Senior Backend Engineer",
-    "company": "Acme",
-    "stack": ["Python", "FastAPI"]
-  },
-  "candidate_profile": {
-    "id": "cand-1",
-    "name": "Jane Doe",
-    "seniority": "senior"
-  },
-  "allow_mock_fallback": true
-}
-JSON
-
 uv run structured-search task gen_cv action \
-  --name gen-cv \
-  --request /tmp/gen_cv_request.json
+  --action-name gen-cv \
+  --request examples/gen_cv/request_example.json
 ```
 
-## 7) API mapping
+## 6) API and UI
+
+```bash
+uv run structured-search dev api --reload
+uv run structured-search dev ui --api-base http://127.0.0.1:8000/v1
+uv run structured-search dev all --reload
+```
+
+## 7) API Mapping
 
 - `GET /v1/tasks`
 - `GET /v1/tasks/{task_id}/profiles`
@@ -157,16 +98,17 @@ uv run structured-search task gen_cv action \
 - `POST /v1/tasks/{task_id}/run`
 - `POST /v1/tasks/{task_id}/actions/gen-cv`
 
-## 8) Quality checks
+## 8) Quality Checks
 
 ```bash
 uv run structured-search quality lint
 uv run structured-search quality format
 uv run structured-search quality test --quick
 uv run structured-search quality arch-lint
+uv run structured-search tools validate-atoms
 ```
 
-## 9) Contract sync for UI
+## 9) Contract Sync for UI
 
 ```bash
 uv run structured-search tools export-openapi --output docs/openapi_v1.json

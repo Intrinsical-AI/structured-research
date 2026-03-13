@@ -212,7 +212,7 @@ Flow:
 ### 5.5 CV generation action (`gen_cv.generate_cv`)
 
 Trigger:
-- CLI `structured-search task gen_cv action --name gen-cv`
+- CLI `structured-search task gen_cv action --action-name gen-cv`
 - API `POST /v1/tasks/gen_cv/actions/gen-cv`
 
 Flow:

@@ -101,7 +101,7 @@ Unknown `task_id` returns:
 ```json
 POST /v1/tasks/job_search/prompt/generate
 {
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "step": "S3_execute"
 }
 ```
@@ -111,7 +111,7 @@ POST /v1/tasks/job_search/prompt/generate
 ```json
 POST /v1/tasks/job_search/jsonl/validate
 {
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "raw_jsonl": "{\"id\":\"1\",\"source\":\"linkedin\",\"title\":\"Senior Engineer\",\"company\":\"Acme\",\"stack\":[\"python\"],\"modality\":\"remote\",\"seniority\":{\"level\":\"senior\"},\"apply_url\":\"https://acme.com/apply\",\"geo\":{\"region\":\"EU\"},\"evidence\":[],\"facts\":[],\"inferences\":[],\"anomalies\":[],\"incomplete\":false}\n"
 }
 ```
@@ -121,7 +121,7 @@ POST /v1/tasks/job_search/jsonl/validate
 ```json
 POST /v1/tasks/job_search/run
 {
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "records": [
     {
       "id": "1",
@@ -149,7 +149,7 @@ POST /v1/tasks/job_search/run
 ```json
 POST /v1/tasks/job_search/run/validate
 {
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "records": [],
   "require_snapshot": true
 }
@@ -160,7 +160,7 @@ POST /v1/tasks/job_search/run/validate
 ```json
 POST /v1/tasks/gen_cv/actions/gen-cv
 {
-  "profile_id": "profile_1",
+  "profile_id": "profile_example",
   "job": {
     "id": "job-1",
     "title": "Backend Engineer",

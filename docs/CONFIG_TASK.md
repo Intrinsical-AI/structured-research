@@ -91,9 +91,9 @@ Validation examples:
 Examples:
 
 ```bash
-cp -r config/job_search/profile_1 config/job_search/profile_new
-cp -r config/product_search/profile_default config/product_search/profile_new
-cp -r config/gen_cv/profile_1 config/gen_cv/profile_new
+cp -r config/job_search/profile_example config/job_search/profile_new
+cp -r config/product_search/profile_example config/product_search/profile_new
+cp -r config/gen_cv/profile_example config/gen_cv/profile_new
 ```
 
 Then edit `config/{task_id}/profile_new/bundle.json`.
@@ -109,7 +109,7 @@ Compose a single `bundle.json` manually by embedding template sections under:
 You can also scaffold a new task layout with:
 
 ```bash
-uv run structured-search tools scaffold-task --name <new_task_id>
+uv run structured-search tools scaffold-task --task-id <new_task_id>
 ```
 
 ## 7) Minimal valid examples
