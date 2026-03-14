@@ -50,16 +50,12 @@ class PenaltiesConfig(BaseModel):
     incomplete: float = 0.0
     missing_salary: float = 0.0
     old_posting: ThresholdPenalty = Field(
-        default_factory=lambda: ThresholdPenalty(
-            field="recency.activity_age_days", threshold=30
-        )
+        default_factory=lambda: ThresholdPenalty(field="recency.activity_age_days", threshold=30)
     )
     inference_used: float = 0.0
     prompt_injection_suspected: float = 0.0
     excess_hybrid_days: ThresholdPenalty = Field(
-        default_factory=lambda: ThresholdPenalty(
-            field="onsite_days_per_week", threshold=3
-        )
+        default_factory=lambda: ThresholdPenalty(field="onsite_days_per_week", threshold=3)
     )
 
 

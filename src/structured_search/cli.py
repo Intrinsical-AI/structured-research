@@ -13,11 +13,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from structured_search.application.core.bundle_service import list_profiles
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
 from structured_search.application.core.task_registry import get_task_registry
-from structured_search.application.core.bundle_service import list_profiles
 from structured_search.contracts import GenCVRequest, RunScoreRequest
 from structured_search.tools import (
     export_openapi,
@@ -579,7 +579,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     task_validate.set_defaults(func=_cmd_task_run_validate, fail_on_not_ok=True)
 
-    task_gen_cv = task_sub.add_parser("gen-cv", help="Generate a CV for a job posting (gen_cv task)")
+    task_gen_cv = task_sub.add_parser(
+        "gen-cv", help="Generate a CV for a job posting (gen_cv task)"
+    )
     task_gen_cv.add_argument(
         "--request",
         required=True,

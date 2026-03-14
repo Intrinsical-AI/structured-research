@@ -96,9 +96,7 @@ class ConstraintRule(BaseModel):
                     f"got weights={len(self.weights)} vs value={len(self.value)}"
                 )
         elif self.weights is not None:
-            raise ValueError(
-                f"'weights' is only valid when op='weighted', but op='{self.op}'"
-            )
+            raise ValueError(f"'weights' is only valid when op='weighted', but op='{self.op}'")
 
         return self
 

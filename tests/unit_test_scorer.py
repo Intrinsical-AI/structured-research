@@ -531,7 +531,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
+            old_posting=ThresholdPenalty(
+                penalty=1.0, field="recency.activity_age_days", threshold=30
+            ),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 45})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
@@ -541,7 +543,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
+            old_posting=ThresholdPenalty(
+                penalty=1.0, field="recency.activity_age_days", threshold=30
+            ),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": "old"})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
@@ -551,7 +555,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
+            old_posting=ThresholdPenalty(
+                penalty=1.0, field="recency.activity_age_days", threshold=30
+            ),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 10})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
@@ -561,7 +567,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
+            old_posting=ThresholdPenalty(
+                penalty=1.0, field="recency.activity_age_days", threshold=30
+            ),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 10})
         with caplog.at_level(logging.WARNING):
@@ -572,7 +580,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            excess_hybrid_days=ThresholdPenalty(penalty=2.0, field="onsite_days_per_week", threshold=3),
+            excess_hybrid_days=ThresholdPenalty(
+                penalty=2.0, field="onsite_days_per_week", threshold=3
+            ),
         )
         record = BaseResult(id="r1", source="test", onsite_days_per_week=4)
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
@@ -582,7 +592,9 @@ class TestHeuristicScorerSoftScoring:
         from structured_search.infra.scoring_config import ThresholdPenalty
 
         penalties = PenaltiesConfig(
-            excess_hybrid_days=ThresholdPenalty(penalty=2.0, field="onsite_days_per_week", threshold=3),
+            excess_hybrid_days=ThresholdPenalty(
+                penalty=2.0, field="onsite_days_per_week", threshold=3
+            ),
         )
         record = BaseResult(id="r1", source="test", onsite_days_per_week=2.5)
         with caplog.at_level(logging.WARNING):
