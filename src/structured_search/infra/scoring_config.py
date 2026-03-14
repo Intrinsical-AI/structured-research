@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from structured_search.domain import ConstraintRule
 
 
 class GatesConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     hard_filters_mode: Literal["require_all", "require_any"] = "require_all"
     """
     require_all → AND semantics: every hard filter must pass (each failure is a gate failure)
@@ -25,26 +27,46 @@ class GatesConfig(BaseModel):
 
 
 class SignalBoostConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     evidence_present: float = 0.0
     salary_disclosed: float = 0.0
     salary_field: str = "economics.salary_eur_gross"
 
 
+class ThresholdPenalty(BaseModel):
+    """A penalty applied when a numeric field exceeds a threshold."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    penalty: float = 0.0
+    field: str
+    threshold: int
+
+
 class PenaltiesConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     incomplete: float = 0.0
     missing_salary: float = 0.0
-    old_posting: float = 0.0
-    old_posting_field: str = "recency.activity_age_days"
-    old_posting_threshold_days: int = 30
+    old_posting: ThresholdPenalty = Field(
+        default_factory=lambda: ThresholdPenalty(
+            field="recency.activity_age_days", threshold=30
+        )
+    )
     inference_used: float = 0.0
     prompt_injection_suspected: float = 0.0
-    excess_hybrid_days: float = 0.0
-    excess_hybrid_days_field: str = "onsite_days_per_week"
-    excess_hybrid_days_threshold: int = 3
+    excess_hybrid_days: ThresholdPenalty = Field(
+        default_factory=lambda: ThresholdPenalty(
+            field="onsite_days_per_week", threshold=3
+        )
+    )
 
 
 class SoftScoringConfig(BaseModel):
-    formula_version: str = "v2_soft_after_gates"
+    model_config = ConfigDict(extra="forbid")
+
+    formula_version: Literal["v2_soft_after_gates"] = "v2_soft_after_gates"
     prefer_weight_default: float = 1.0
     avoid_penalty_default: float = 1.0
     gates: GatesConfig = Field(default_factory=GatesConfig)

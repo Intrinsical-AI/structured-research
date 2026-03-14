@@ -1,20 +1,18 @@
 """Config loader: maps task.json / task_config.json to runtime configs.
 
 The task.json stores scoring gates and soft-scoring parameters in a human-
-editable format. This module converts that
-format to the SoftScoringConfig dataclasses used by HeuristicScorer so
-the runtime config always reflects the profile config instead of hardcoded
-defaults.
+editable format. This module converts that format to SoftScoringConfig used
+by HeuristicScorer so the runtime config always reflects the profile config
+instead of hardcoded defaults.
 """
 
 from __future__ import annotations
 
 import types as _types
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from structured_search.domain.models import ConstraintRule
 from structured_search.infra.scoring_config import (
     GatesConfig,
     PenaltiesConfig,
@@ -93,54 +91,25 @@ def collect_model_field_paths(
     return frozenset(paths)
 
 
-class TaskGatesInput(BaseModel):
-    """Validated task.gates payload."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    hard_filters_mode: Literal["require_any", "require_all"] = "require_all"
-    hard_filters: list[ConstraintRule] = Field(default_factory=list)
-    reject_anomalies: list[str] = Field(default_factory=list)
-    required_evidence_fields: list[str] = Field(default_factory=list)
+# ---------------------------------------------------------------------------
+# Task runtime config — top-level parse target for bundle.task
+# ---------------------------------------------------------------------------
 
 
-class TaskSignalBoostInput(BaseModel):
-    """Validated task.soft_scoring.signal_boost payload."""
+class _TaskSoftScoringInput(BaseModel):
+    """Validated task.soft_scoring payload.
 
-    model_config = ConfigDict(extra="allow")
-
-    evidence_present: float = 0.0
-    salary_disclosed: float = 0.0
-    salary_field: str = "economics.salary_eur_gross"
-
-
-class TaskPenaltiesInput(BaseModel):
-    """Validated task.soft_scoring.penalties payload."""
-
-    model_config = ConfigDict(extra="allow")
-
-    incomplete: float = 0.0
-    missing_salary: float = 0.0
-    old_posting: float = 0.0
-    old_posting_field: str = "recency.activity_age_days"
-    old_posting_threshold_days: int = 30
-    inference_used: float = 0.0
-    prompt_injection_suspected: float = 0.0
-    excess_hybrid_days: float = 0.0
-    excess_hybrid_days_field: str = "onsite_days_per_week"
-    excess_hybrid_days_threshold: int = 3
-
-
-class TaskSoftScoringInput(BaseModel):
-    """Validated task.soft_scoring payload."""
+    Uses scoring_config models directly; ``extra="allow"`` permits future
+    top-level keys (e.g. normalization, dedupe) without breaking validation.
+    """
 
     model_config = ConfigDict(extra="allow")
 
     formula_version: str = "v2_soft_after_gates"
     prefer_weight_default: float = 1.0
     avoid_penalty_default: float = 1.0
-    signal_boost: TaskSignalBoostInput = Field(default_factory=TaskSignalBoostInput)
-    penalties: TaskPenaltiesInput = Field(default_factory=TaskPenaltiesInput)
+    signal_boost: SignalBoostConfig = Field(default_factory=SignalBoostConfig)
+    penalties: PenaltiesConfig = Field(default_factory=PenaltiesConfig)
 
 
 class TaskRuntimeConfig(BaseModel):
@@ -148,18 +117,18 @@ class TaskRuntimeConfig(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    gates: TaskGatesInput
-    soft_scoring: TaskSoftScoringInput
+    gates: GatesConfig
+    soft_scoring: _TaskSoftScoringInput
 
 
 def task_json_to_scoring_config(task: dict | TaskRuntimeConfig) -> SoftScoringConfig:
-    """Convert a task.json dict to a SoftScoringConfig for HeuristicScorer.
+    """Convert a bundle.task dict to a SoftScoringConfig for HeuristicScorer.
 
     Only the ``gates`` and ``soft_scoring`` top-level keys are consumed;
     ``normalization``, ``dedupe``, etc. are ignored here.
 
     Args:
-        task: Parsed task.json as a Python dict.
+        task: Parsed task.json as a Python dict or already-validated TaskRuntimeConfig.
 
     Returns:
         SoftScoringConfig ready to pass to HeuristicScorer.
@@ -167,42 +136,12 @@ def task_json_to_scoring_config(task: dict | TaskRuntimeConfig) -> SoftScoringCo
     task_input = (
         task if isinstance(task, TaskRuntimeConfig) else TaskRuntimeConfig.model_validate(task)
     )
-
-    gates = GatesConfig(
-        hard_filters_mode=task_input.gates.hard_filters_mode,
-        hard_filters=task_input.gates.hard_filters,
-        reject_anomalies=task_input.gates.reject_anomalies,
-        required_evidence_fields=task_input.gates.required_evidence_fields,
-    )
-
-    # --- signal boosts ---
-    signal_boost_in = task_input.soft_scoring.signal_boost
-    signal_boost = SignalBoostConfig(
-        evidence_present=signal_boost_in.evidence_present,
-        salary_disclosed=signal_boost_in.salary_disclosed,
-        salary_field=signal_boost_in.salary_field,
-    )
-
-    # --- penalties ---
-    penalties_in = task_input.soft_scoring.penalties
-    penalties = PenaltiesConfig(
-        incomplete=penalties_in.incomplete,
-        missing_salary=penalties_in.missing_salary,
-        old_posting=penalties_in.old_posting,
-        old_posting_field=penalties_in.old_posting_field,
-        old_posting_threshold_days=penalties_in.old_posting_threshold_days,
-        inference_used=penalties_in.inference_used,
-        prompt_injection_suspected=penalties_in.prompt_injection_suspected,
-        excess_hybrid_days=penalties_in.excess_hybrid_days,
-        excess_hybrid_days_field=penalties_in.excess_hybrid_days_field,
-        excess_hybrid_days_threshold=penalties_in.excess_hybrid_days_threshold,
-    )
-
+    ss = task_input.soft_scoring
     return SoftScoringConfig(
-        formula_version=task_input.soft_scoring.formula_version,
-        prefer_weight_default=task_input.soft_scoring.prefer_weight_default,
-        avoid_penalty_default=task_input.soft_scoring.avoid_penalty_default,
-        gates=gates,
-        signal_boost=signal_boost,
-        penalties=penalties,
+        formula_version=ss.formula_version,
+        prefer_weight_default=ss.prefer_weight_default,
+        avoid_penalty_default=ss.avoid_penalty_default,
+        gates=task_input.gates,
+        signal_boost=ss.signal_boost,
+        penalties=ss.penalties,
     )

@@ -13,7 +13,7 @@ from structured_search.application.common.dependencies import (
     resolve_dependencies,
 )
 from structured_search.application.gen_cv.service import GenCVService
-from structured_search.contracts import CvCandidateInput, GenCVResponse
+from structured_search.contracts import CandidateInput, GenCVResponse
 from structured_search.domain.gen_cv.models import (
     CandidateAtomsProfile,
     GeneratedCV,
@@ -75,7 +75,7 @@ def _job_input_to_description(job: dict[str, Any]) -> JobDescription:
 
 def _candidate_input_to_profile(
     profile_id: str,
-    candidate: CvCandidateInput,
+    candidate: CandidateInput,
 ) -> CandidateAtomsProfile:
     seniority = _coerce_seniority(candidate.seniority)
 
@@ -199,7 +199,7 @@ def gen_cv(
     task_id: str = "gen_cv",
     profile_id: str,
     job: dict[str, Any],
-    candidate_profile: CvCandidateInput | dict[str, Any],
+    candidate_profile: CandidateInput | dict[str, Any],
     selected_claim_ids: list[str] | None = None,
     llm_model: str | None = None,
     allow_mock_fallback: bool = True,
@@ -218,8 +218,8 @@ def gen_cv(
     job_model = _job_input_to_description(job)
     candidate_input = (
         candidate_profile
-        if isinstance(candidate_profile, CvCandidateInput)
-        else CvCandidateInput.model_validate(candidate_profile)
+        if isinstance(candidate_profile, CandidateInput)
+        else CandidateInput.model_validate(candidate_profile)
     )
     candidate_model = _candidate_input_to_profile(profile_id, candidate_input)
 

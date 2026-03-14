@@ -5,7 +5,7 @@ from __future__ import annotations
 from structured_search.application.common.dependencies import ApplicationDependencies
 from structured_search.application.core.task_plugin import TaskPlugin
 from structured_search.application.gen_cv.generate_cv import gen_cv
-from structured_search.contracts import CvCandidateInput, GenCVResponse
+from structured_search.contracts import CandidateInput, GenCVResponse
 from structured_search.domain.models import BaseConstraints
 
 
@@ -13,7 +13,7 @@ def _run_gen_cv_action(
     *,
     profile_id: str,
     job: dict,
-    candidate_profile: CvCandidateInput | dict,
+    candidate_profile: CandidateInput | dict,
     selected_claim_ids: list[str] | None = None,
     llm_model: str | None = None,
     allow_mock_fallback: bool = True,

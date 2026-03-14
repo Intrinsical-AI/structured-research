@@ -528,40 +528,40 @@ class TestHeuristicScorerSoftScoring:
         assert scored_without.score_breakdown.penalties == 0.5
 
     def test_old_posting_penalty(self):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            old_posting=1.0,
-            old_posting_field="recency.activity_age_days",
-            old_posting_threshold_days=30,
+            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 45})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
         assert scored.score_breakdown.penalties == 1.0
 
     def test_old_posting_penalty_ignores_type_mismatch(self):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            old_posting=1.0,
-            old_posting_field="recency.activity_age_days",
-            old_posting_threshold_days=30,
+            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": "old"})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
         assert scored.score_breakdown.penalties == 0.0
 
     def test_old_posting_not_applied_when_recent(self):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            old_posting=1.0,
-            old_posting_field="recency.activity_age_days",
-            old_posting_threshold_days=30,
+            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 10})
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
         assert scored.score_breakdown.penalties == 0.0
 
     def test_old_posting_numeric_below_threshold_does_not_log_type_mismatch(self, caplog):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            old_posting=1.0,
-            old_posting_field="recency.activity_age_days",
-            old_posting_threshold_days=30,
+            old_posting=ThresholdPenalty(penalty=1.0, field="recency.activity_age_days", threshold=30),
         )
         record = BaseResult(id="r1", source="test", recency={"activity_age_days": 10})
         with caplog.at_level(logging.WARNING):
@@ -569,20 +569,20 @@ class TestHeuristicScorerSoftScoring:
         assert "Type mismatch for penalty field 'recency.activity_age_days'" not in caplog.text
 
     def test_excess_hybrid_days_penalty(self):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            excess_hybrid_days=2.0,
-            excess_hybrid_days_field="onsite_days_per_week",
-            excess_hybrid_days_threshold=3,
+            excess_hybrid_days=ThresholdPenalty(penalty=2.0, field="onsite_days_per_week", threshold=3),
         )
         record = BaseResult(id="r1", source="test", onsite_days_per_week=4)
         scored = _scorer(penalties=penalties).score(record, _make_constraints())
         assert scored.score_breakdown.penalties == 2.0
 
     def test_excess_hybrid_numeric_below_threshold_does_not_log_type_mismatch(self, caplog):
+        from structured_search.infra.scoring_config import ThresholdPenalty
+
         penalties = PenaltiesConfig(
-            excess_hybrid_days=2.0,
-            excess_hybrid_days_field="onsite_days_per_week",
-            excess_hybrid_days_threshold=3,
+            excess_hybrid_days=ThresholdPenalty(penalty=2.0, field="onsite_days_per_week", threshold=3),
         )
         record = BaseResult(id="r1", source="test", onsite_days_per_week=2.5)
         with caplog.at_level(logging.WARNING):

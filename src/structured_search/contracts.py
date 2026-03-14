@@ -223,7 +223,7 @@ class RunValidateSummary(BaseModel):
     snapshot_probe_error: str | None = None
 
 
-class CvSkillSetInput(BaseModel):
+class CandidateSkillSet(BaseModel):
     """External candidate skill shape for gen-cv action."""
 
     languages: list[str] = Field(default_factory=list)
@@ -232,7 +232,7 @@ class CvSkillSetInput(BaseModel):
     domains: list[str] = Field(default_factory=list)
 
 
-class CvExperienceInput(BaseModel):
+class CandidateExperience(BaseModel):
     """External candidate experience entry for gen-cv action."""
 
     company: str
@@ -242,14 +242,14 @@ class CvExperienceInput(BaseModel):
     stack: list[str] = Field(default_factory=list)
 
 
-class CvCandidateInput(BaseModel):
+class CandidateInput(BaseModel):
     """External candidate payload for gen-cv action."""
 
     id: str | None = None
     name: str | None = None
     seniority: str
-    tech_stack: CvSkillSetInput | None = None
-    experience: list[CvExperienceInput] = Field(default_factory=list)
+    tech_stack: CandidateSkillSet | None = None
+    experience: list[CandidateExperience] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)
     spoken_languages: list[str] = Field(default_factory=list)
     location: str | None = None
@@ -263,7 +263,7 @@ class GenCVRequest(BaseModel):
 
     profile_id: str
     job: dict[str, Any]
-    candidate_profile: CvCandidateInput
+    candidate_profile: CandidateInput
     selected_claim_ids: list[str] | None = None
     llm_model: str | None = Field(default=None)
     allow_mock_fallback: bool = True

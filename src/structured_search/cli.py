@@ -17,6 +17,7 @@ from structured_search.application.core.ingest_service import ingest_validate_js
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
 from structured_search.application.core.task_registry import get_task_registry
+from structured_search.application.core.bundle_service import list_profiles
 from structured_search.contracts import GenCVRequest, RunScoreRequest
 from structured_search.tools import (
     export_openapi,
@@ -125,7 +126,14 @@ def _cmd_metrics_populate(args: argparse.Namespace) -> int:
 
 
 def _cmd_tasks_list(_args: argparse.Namespace) -> int:
-    tasks = [item.model_dump(mode="json") for item in get_task_registry().list()]
+    tasks = []
+    for item in get_task_registry().list():
+        entry = item.model_dump(mode="json")
+        try:
+            entry["profiles"] = list_profiles(task_id=item.task_id)
+        except Exception:
+            entry["profiles"] = []
+        tasks.append(entry)
     print(json.dumps(tasks, indent=2, ensure_ascii=False))
     return 0
 
@@ -259,19 +267,15 @@ def _cmd_task_run_validate(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_task_action(args: argparse.Namespace) -> int:
+def _cmd_task_gen_cv(args: argparse.Namespace) -> int:
     plugin = _plugin_or_exit(args.task_id)
-    action_name = args.action_name
-    if not plugin.supports(f"action:{action_name}"):
-        print(
-            f"Task {args.task_id!r} does not support action {action_name!r}",
-            file=sys.stderr,
-        )
+    if not plugin.supports("action:gen-cv"):
+        print(f"Task {args.task_id!r} does not support action 'gen-cv'", file=sys.stderr)
         return 1
 
-    handler = plugin.action_handlers.get(action_name)
+    handler = plugin.action_handlers.get("gen-cv")
     if handler is None:
-        print(f"Action handler not found for {action_name!r}", file=sys.stderr)
+        print(f"Action handler 'gen-cv' not found for task {args.task_id!r}", file=sys.stderr)
         return 1
 
     request_path = Path(args.request)
@@ -281,31 +285,28 @@ def _cmd_task_action(args: argparse.Namespace) -> int:
 
     try:
         payload = json.loads(request_path.read_text(encoding="utf-8"))
+        request = GenCVRequest.model_validate(payload)
     except json.JSONDecodeError as exc:
         print(f"Invalid JSON in request file: {exc}", file=sys.stderr)
         return 1
-
-    try:
-        if action_name == "gen-cv":
-            request = GenCVRequest.model_validate(payload)
-            response = handler(
-                profile_id=request.profile_id,
-                job=request.job,
-                candidate_profile=request.candidate_profile,
-                selected_claim_ids=request.selected_claim_ids,
-                llm_model=request.llm_model,
-                allow_mock_fallback=request.allow_mock_fallback,
-            )
-        else:
-            response = handler(**payload)
     except Exception as exc:
-        print(f"Action failed: {exc}", file=sys.stderr)
+        print(f"Invalid request payload: {exc}", file=sys.stderr)
         return 1
 
-    if hasattr(response, "model_dump"):
-        print(json.dumps(response.model_dump(mode="json"), indent=2, ensure_ascii=False))
-    else:
-        print(json.dumps(response, indent=2, ensure_ascii=False))
+    try:
+        response = handler(
+            profile_id=request.profile_id,
+            job=request.job,
+            candidate_profile=request.candidate_profile,
+            selected_claim_ids=request.selected_claim_ids,
+            llm_model=request.llm_model,
+            allow_mock_fallback=request.allow_mock_fallback,
+        )
+    except Exception as exc:
+        print(f"gen-cv failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(json.dumps(response.model_dump(mode="json"), indent=2, ensure_ascii=False))
     return 0
 
 
@@ -571,21 +572,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     task_validate.add_argument("--require-snapshot", action="store_true")
     task_validate.add_argument(
-        "--allow-not-ok",
+        "--no-fail-on-error",
         action="store_false",
         dest="fail_on_not_ok",
-        help="Return 0 even if response.ok is false",
+        help="Return exit code 0 even if validation response.ok is false",
     )
     task_validate.set_defaults(func=_cmd_task_run_validate, fail_on_not_ok=True)
 
-    task_action = task_sub.add_parser("action", help="Execute a task action handler")
-    task_action.add_argument(
-        "--action-name",
+    task_gen_cv = task_sub.add_parser("gen-cv", help="Generate a CV for a job posting (gen_cv task)")
+    task_gen_cv.add_argument(
+        "--request",
         required=True,
-        help="Action name (e.g., gen-cv)",
+        help="Path to a JSON file with a GenCVRequest payload",
     )
-    task_action.add_argument("--request", required=True, help="JSON request payload file")
-    task_action.set_defaults(func=_cmd_task_action)
+    task_gen_cv.set_defaults(func=_cmd_task_gen_cv)
 
     api = subparsers.add_parser("api", help="HTTP API operations")
     api_sub = api.add_subparsers(dest="api_cmd", parser_class=NoAbbrevArgumentParser)

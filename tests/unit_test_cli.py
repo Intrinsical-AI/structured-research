@@ -117,27 +117,23 @@ def test_parser_accepts_tasks_list_command():
     assert callable(args.func)
 
 
-def test_parser_accepts_task_action_command():
+def test_parser_accepts_task_gen_cv_command():
     parser = cli.build_parser()
-    args = parser.parse_args(
-        ["task", "gen_cv", "action", "--action-name", "gen-cv", "--request", "req.json"]
-    )
+    args = parser.parse_args(["task", "gen_cv", "gen-cv", "--request", "req.json"])
     assert args.group == "task"
     assert args.task_id == "gen_cv"
-    assert args.task_cmd == "action"
+    assert args.task_cmd == "gen-cv"
     assert callable(args.func)
 
 
-def test_parser_rejects_legacy_action_flag():
+def test_parser_rejects_gen_cv_missing_request():
     parser = cli.build_parser()
     try:
-        parser.parse_args(
-            ["task", "gen_cv", "action", "--name", "gen-cv", "--request", "req.json"]
-        )
+        parser.parse_args(["task", "gen_cv", "gen-cv"])
     except SystemExit as exc:
         assert exc.code != 0
     else:
-        raise AssertionError("legacy --name flag should be rejected")
+        raise AssertionError("missing --request should be rejected")
 
 
 def test_parser_accepts_tools_flags_with_standardized_ids():
