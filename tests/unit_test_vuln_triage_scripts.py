@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def _load_script_module(repo_root: Path, name: str):
-    script_path = repo_root.parent / "synergy" / "scripts" / f"{name}.py"
+    script_path = repo_root / "scripts" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name, script_path)
     if spec is None or spec.loader is None:
         raise AssertionError(f"Could not load script module: {script_path}")
@@ -122,7 +122,7 @@ def test_vulns_ingest_rag_import_uses_json_flag(tmp_path: Path, repo_root: Path,
 
 def test_vuln_pilot_profiles_produce_different_gate_counts(tmp_path: Path, repo_root: Path):
     module = _load_script_module(repo_root, "vulns_batch_triage")
-    input_path = repo_root.parent / "synergy" / "vuln_pilot" / "prepared" / "pilot_small_v1.jsonl"
+    input_path = repo_root / "tests" / "fixtures" / "vuln_pilot" / "pilot_small_v1.jsonl"
 
     high_path = tmp_path / "high.jsonl"
     cwe78_path = tmp_path / "cwe78.jsonl"
