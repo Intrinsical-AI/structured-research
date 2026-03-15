@@ -20,7 +20,6 @@ from structured_search.api.wiring import (
     configure_wired_registry,
 )
 from structured_search.application.common.dependencies import clear_configured_dependencies
-from structured_search.application.core.task_registry import clear_task_registry
 from structured_search.application.common.metrics import emit_q2_metric_event
 from structured_search.application.core.bundle_service import (
     list_profiles,
@@ -30,7 +29,7 @@ from structured_search.application.core.bundle_service import (
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
-from structured_search.application.core.task_registry import get_task_registry
+from structured_search.application.core.task_registry import clear_task_registry, get_task_registry
 from structured_search.contracts import (
     BundleSaveResponse,
     BundleWriteResponse,
