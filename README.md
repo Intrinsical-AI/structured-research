@@ -18,7 +18,6 @@ uv run structured-search task job_search run \
 uv run structured-search task job_search run-validate \
   --request examples/job_search/run_request_example.json
 uv run structured-search task gen_cv action \
-  --action-name gen-cv \
   --request examples/gen_cv/request_example.json
 ```
 
@@ -29,6 +28,7 @@ uv run structured-search task gen_cv action \
 | `job_search` | `prompt`, `jsonl_validate`, `run` |
 | `product_search` | `prompt`, `jsonl_validate`, `run` |
 | `gen_cv` | `action:gen-cv` |
+| `vuln_triage` | `jsonl_validate`, `run` |
 
 ## Runtime Layout
 

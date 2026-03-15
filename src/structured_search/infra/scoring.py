@@ -191,15 +191,15 @@ class HeuristicScorer(ScoringPort):
 
         penalties += self._numeric_threshold_penalty(
             data=data,
-            field_path=self.config.penalties.old_posting_field,
-            threshold=self.config.penalties.old_posting_threshold_days,
-            penalty=self.config.penalties.old_posting,
+            field_path=self.config.penalties.old_posting.field,
+            threshold=self.config.penalties.old_posting.threshold,
+            penalty=self.config.penalties.old_posting.penalty,
         )
         penalties += self._numeric_threshold_penalty(
             data=data,
-            field_path=self.config.penalties.excess_hybrid_days_field,
-            threshold=self.config.penalties.excess_hybrid_days_threshold,
-            penalty=self.config.penalties.excess_hybrid_days,
+            field_path=self.config.penalties.excess_hybrid_days.field,
+            threshold=self.config.penalties.excess_hybrid_days.threshold,
+            penalty=self.config.penalties.excess_hybrid_days.penalty,
         )
 
         return boosts, penalties

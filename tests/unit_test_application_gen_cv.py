@@ -65,10 +65,13 @@ def _job() -> dict:
     }
 
 
-def test_gen_cv_uses_fallback_when_ollama_is_unavailable(tmp_path: Path):
-    class _BrokenOllama:
-        def __init__(self, model: str, base_url: str):
-            raise RuntimeError("ollama unavailable")
+def test_gen_cv_uses_fallback_when_llm_is_unavailable(tmp_path: Path, monkeypatch):
+    import structured_search.application.gen_cv.generate_cv as gen_cv_app
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(gen_cv_app, "build_llm", _boom)
 
     result = gen_cv(
         profile_id="profile_example",
@@ -94,10 +97,13 @@ def test_gen_cv_rejects_missing_seniority(tmp_path: Path):
         )
 
 
-def test_gen_cv_raises_when_mock_fallback_disabled(tmp_path: Path):
-    class _BrokenOllama:
-        def __init__(self, model: str, base_url: str):
-            raise RuntimeError("ollama unavailable")
+def test_gen_cv_raises_when_mock_fallback_disabled(tmp_path: Path, monkeypatch):
+    import structured_search.application.gen_cv.generate_cv as gen_cv_app
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(gen_cv_app, "build_llm", _boom)
 
     with pytest.raises(RuntimeError):
         gen_cv(

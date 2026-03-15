@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from structured_search.application.core.plugins.gen_cv import GEN_CV_PLUGIN
 from structured_search.application.core.plugins.job_search import JOB_SEARCH_PLUGIN
 from structured_search.application.core.plugins.product_search import PRODUCT_SEARCH_PLUGIN
+from structured_search.application.core.plugins.vuln_triage import VULN_TRIAGE_PLUGIN
 from structured_search.application.core.task_plugin import TaskPlugin
 from structured_search.contracts import TaskSummary
 
@@ -34,6 +35,7 @@ _DEFAULT_REGISTRY = TaskRegistry(
         JOB_SEARCH_PLUGIN.task_id: JOB_SEARCH_PLUGIN,
         GEN_CV_PLUGIN.task_id: GEN_CV_PLUGIN,
         PRODUCT_SEARCH_PLUGIN.task_id: PRODUCT_SEARCH_PLUGIN,
+        VULN_TRIAGE_PLUGIN.task_id: VULN_TRIAGE_PLUGIN,
     }
 )
 
