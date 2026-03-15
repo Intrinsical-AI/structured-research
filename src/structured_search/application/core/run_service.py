@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from structured_search.application.common.dependencies import (
     ApplicationDependencies,
@@ -19,7 +19,7 @@ from structured_search.application.common.dependencies import (
 from structured_search.application.common.errors import SnapshotPersistenceError
 from structured_search.application.common.validation_messages import format_schema_validation_error
 from structured_search.application.core.bundle_service import bundle_to_data, load_bundle
-from structured_search.application.core.task_plugin import TaskPlugin
+from structured_search.application.core.task_plugin import BuildRuntimeFn, TaskPlugin
 from structured_search.contracts import (
     IngestError,
     RunScoreRequest,
@@ -37,15 +37,16 @@ def _make_run_id(task_id: str, profile_id: str) -> str:
     return f"{task_id}-{profile_id}-{ts}-{short}"
 
 
-def _require_plugin_runtime(plugin: TaskPlugin) -> None:
+def _require_plugin_runtime(plugin: TaskPlugin) -> tuple[BuildRuntimeFn, type[BaseModel]]:
     if plugin.build_runtime is None or plugin.record_model is None:
         raise ValueError(f"Task {plugin.task_id!r} does not support scoring runtime")
+    return plugin.build_runtime, plugin.record_model
 
 
 def _validate_records(
     records: list[dict[str, Any]],
     *,
-    record_model,
+    record_model: type[BaseModel],
 ) -> tuple[list[Any], list[IngestError]]:
     valid: list[Any] = []
     schema_errors: list[IngestError] = []
@@ -73,14 +74,14 @@ def run_score(
     plugin: TaskPlugin,
     deps: ApplicationDependencies | None = None,
 ) -> RunSummary:
-    _require_plugin_runtime(plugin)
+    build_runtime, record_model = _require_plugin_runtime(plugin)
 
     resolved = resolve_dependencies(deps)
     bundle = load_bundle(task_id=task_id, profile_id=request.profile_id, deps=resolved)
-    constraints, scorer = plugin.build_runtime(bundle.constraints, bundle.task)  # type: ignore[misc]
+    constraints, scorer = build_runtime(bundle.constraints, bundle.task)
     valid_records, schema_errors = _validate_records(
         request.records,
-        record_model=plugin.record_model,  # type: ignore[arg-type]
+        record_model=record_model,
     )
 
     skipped = len(schema_errors)
@@ -147,14 +148,74 @@ def validate_run(
     plugin: TaskPlugin,
     deps: ApplicationDependencies | None = None,
 ) -> RunValidateSummary:
-    _require_plugin_runtime(plugin)
+    build_runtime, record_model = _require_plugin_runtime(plugin)
 
     resolved = resolve_dependencies(deps)
-    bundle = load_bundle(task_id=task_id, profile_id=request.profile_id, deps=resolved)
-    plugin.build_runtime(bundle.constraints, bundle.task)  # type: ignore[misc]
+
+    try:
+        bundle = load_bundle(task_id=task_id, profile_id=request.profile_id, deps=resolved)
+    except FileNotFoundError:
+        return RunValidateSummary(
+            ok=False,
+            profile_id=request.profile_id,
+            total_records=len(request.records),
+            valid_records=0,
+            invalid_records=0,
+            errors=[],
+            checks=RunValidateChecks(
+                profile_exists=False,
+                constraints_valid=False,
+                scoring_config_valid=False,
+                all_records_schema_valid=False,
+                snapshot_io_checked=False,
+            ),
+        )
+
+    # Step 1: validate constraints payload shape independently.
+    if plugin.constraints_model is not None:
+        try:
+            plugin.constraints_model.model_validate(bundle.constraints)
+        except (ValueError, ValidationError):
+            return RunValidateSummary(
+                ok=False,
+                profile_id=request.profile_id,
+                total_records=len(request.records),
+                valid_records=0,
+                invalid_records=0,
+                errors=[],
+                checks=RunValidateChecks(
+                    profile_exists=True,
+                    constraints_valid=False,
+                    scoring_config_valid=False,
+                    all_records_schema_valid=False,
+                    snapshot_io_checked=False,
+                ),
+            )
+
+    # Step 2: build full runtime — isolates scoring config failures from constraints.
+    # If this raises after step 1 passed, the problem is in task/scoring config.
+    try:
+        _ = build_runtime(bundle.constraints, bundle.task)
+    except (ValueError, ValidationError):
+        return RunValidateSummary(
+            ok=False,
+            profile_id=request.profile_id,
+            total_records=len(request.records),
+            valid_records=0,
+            invalid_records=0,
+            errors=[],
+            checks=RunValidateChecks(
+                profile_exists=True,
+                constraints_valid=True,
+                scoring_config_valid=False,
+                all_records_schema_valid=False,
+                snapshot_io_checked=False,
+            ),
+        )
+
     valid_records, schema_errors = _validate_records(
         request.records,
-        record_model=plugin.record_model,  # type: ignore[arg-type]
+        record_model=record_model,
     )
 
     snapshot_probe = _probe_snapshot_io(

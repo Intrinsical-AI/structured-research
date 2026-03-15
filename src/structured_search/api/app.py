@@ -15,10 +15,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from structured_search.application.common.dependencies import (
-    clear_configured_dependencies,
+from structured_search.api.wiring import (
     configure_filesystem_dependencies,
+    configure_wired_registry,
 )
+from structured_search.application.common.dependencies import clear_configured_dependencies
 from structured_search.application.common.metrics import emit_q2_metric_event
 from structured_search.application.core.bundle_service import (
     list_profiles,
@@ -28,7 +29,7 @@ from structured_search.application.core.bundle_service import (
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
-from structured_search.application.core.task_registry import get_task_registry
+from structured_search.application.core.task_registry import clear_task_registry, get_task_registry
 from structured_search.contracts import (
     BundleSaveResponse,
     BundleWriteResponse,
@@ -63,10 +64,12 @@ async def _lifespan(_app: FastAPI):
         runs_dir=_RUNS_DIR,
         prompts_dir=_PROMPTS_DIR,
     )
+    configure_wired_registry()
     try:
         yield
     finally:
         clear_configured_dependencies()
+        clear_task_registry()
 
 
 app = FastAPI(

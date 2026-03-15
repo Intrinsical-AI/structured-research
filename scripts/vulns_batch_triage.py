@@ -24,6 +24,7 @@ def _load_structured_search():
     from structured_search.application.core.run_service import run_score
     from structured_search.application.core.task_registry import get_task_registry
     from structured_search.contracts import RunScoreRequest
+    from structured_search.infra.loading import TolerantJSONLParser
     from structured_search.infra.persistence_fs import (
         FilesystemProfileRepository,
         FilesystemRunRepository,
@@ -33,6 +34,7 @@ def _load_structured_search():
         "ApplicationDependencies": ApplicationDependencies,
         "FilesystemProfileRepository": FilesystemProfileRepository,
         "FilesystemRunRepository": FilesystemRunRepository,
+        "TolerantJSONLParser": TolerantJSONLParser,
         "RunScoreRequest": RunScoreRequest,
         "get_task_registry": get_task_registry,
         "ingest_validate_jsonl": ingest_validate_jsonl,
@@ -48,6 +50,7 @@ def build_dependencies(structured_research_root: Path, runs_dir: Path):
         ),
         run_repo=sr["FilesystemRunRepository"](base_dir=runs_dir),
         prompts_dir=structured_research_root / "resources" / "prompts",
+        jsonl_parser=sr["TolerantJSONLParser"](),
     )
 
 

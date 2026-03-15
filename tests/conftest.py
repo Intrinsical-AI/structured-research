@@ -8,10 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from structured_search.application.common.dependencies import (
-    clear_configured_dependencies,
+from structured_search.api.wiring import (
     configure_filesystem_dependencies,
+    configure_wired_registry,
 )
+from structured_search.application.common.dependencies import clear_configured_dependencies
+from structured_search.application.core.task_registry import clear_task_registry
 from structured_search.domain import BaseConstraints, BaseResult, ConstraintRule
 from structured_search.domain.job_search.models import (
     GeoInfo,
@@ -57,8 +59,10 @@ def configure_default_test_dependencies(repo_root: Path, tmp_path: Path):
         runs_dir=tmp_path / "runs",
         prompts_dir=repo_root / "resources" / "prompts",
     )
+    configure_wired_registry()
     yield
     clear_configured_dependencies()
+    clear_task_registry()
 
 
 # ---------------------------------------------------------------------------

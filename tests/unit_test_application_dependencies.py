@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from structured_search.api.wiring import configure_filesystem_dependencies
 from structured_search.application.common.dependencies import (
     clear_configured_dependencies,
     configure_dependencies,
-    configure_filesystem_dependencies,
     resolve_dependencies,
 )
+from structured_search.infra.loading import TolerantJSONLParser
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
@@ -22,6 +23,7 @@ def test_configure_dependencies_overrides_runtime_wiring(tmp_path: Path):
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=FilesystemRunRepository(base_dir=tmp_path / "runs"),
         prompts_dir=tmp_path / "prompts",
+        jsonl_parser=TolerantJSONLParser(),
     )
     try:
         resolved = resolve_dependencies()

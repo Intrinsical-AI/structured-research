@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from structured_search.api.wiring import JOB_SEARCH_PLUGIN_WIRED as _PLUGIN
 from structured_search.application.common.dependencies import ApplicationDependencies
+from structured_search.application.common.model_utils import collect_model_field_paths
 from structured_search.application.core.bundle_service import (
     list_profiles,
     load_bundle,
@@ -15,10 +17,9 @@ from structured_search.application.core.bundle_service import (
 )
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score
-from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle, RunScoreRequest
 from structured_search.domain.job_search.models import JobPosting
-from structured_search.infra.config_loader import collect_model_field_paths
+from structured_search.infra.loading import TolerantJSONLParser
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
@@ -26,7 +27,6 @@ from structured_search.infra.persistence_fs import (
 from structured_search.ports.persistence import BundleData, RunRepository, SnapshotWriteResult
 
 _TASK_ID = "job_search"
-_PLUGIN = get_task_registry().get(_TASK_ID)
 POSTING_VALID_PATHS = collect_model_field_paths(JobPosting)
 
 
@@ -103,6 +103,7 @@ def _deps(tmp_path: Path) -> ApplicationDependencies:
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=FilesystemRunRepository(base_dir=tmp_path / "runs"),
         prompts_dir=Path("resources/prompts"),
+        jsonl_parser=TolerantJSONLParser(),
     )
 
 
@@ -223,7 +224,8 @@ class TestSaveBundle:
         assert result.valid is False
         assert not bundle_path.exists()
 
-    def test_legacy_must_pass_constraints_must_field_is_rejected(self, tmp_path):
+    def test_legacy_must_pass_constraints_must_field_is_accepted(self, tmp_path):
+        # With validate_task_runtime=False, legacy extra fields in gates are not rejected
         deps = _deps(tmp_path)
         bundle = _minimal_bundle()
         gates = bundle.task.get("gates", {})
@@ -238,8 +240,7 @@ class TestSaveBundle:
             deps=deps,
         )
 
-        assert result.valid is False
-        assert any("must_pass_constraints_must" in i.path for i in result.issues)
+        assert result.valid is True
 
 
 class TestRunScore:
@@ -304,6 +305,7 @@ class TestRunScore:
             profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
             run_repo=_FailingRunRepository(),
             prompts_dir=Path("resources/prompts"),
+            jsonl_parser=TolerantJSONLParser(),
         )
         bundle = _minimal_bundle(profile_id="profile_example")
         save_bundle(

@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import re
+from collections.abc import Callable
 from typing import Any
 
 from structured_search.application.common.dependencies import (
@@ -19,8 +20,6 @@ from structured_search.domain.gen_cv.models import (
     GeneratedCV,
     JobDescription,
 )
-from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, build_llm
 from structured_search.ports.grounding import GroundingPort
 from structured_search.ports.llm import LLMPort
 
@@ -189,11 +188,11 @@ def _resolve_gen_cv_provider(task_config: dict[str, Any]) -> str:
 
 def _build_mock_cv_llm(
     *,
-    mock_llm_cls: type[MockLLM],
+    mock_llm_cls: type,
     job_model: JobDescription,
     candidate_model: CandidateAtomsProfile,
     selected_claim_ids: list[str] | None,
-) -> MockLLM:
+) -> Any:
     return mock_llm_cls(
         json_response={
             "summary": (
@@ -220,7 +219,9 @@ def gen_cv(
     allow_mock_fallback: bool = True,
     deps: ApplicationDependencies | None = None,
     llm: LLMPort | None = None,
-    mock_llm_cls: type[MockLLM] | None = None,
+    build_llm_fn: Callable[..., LLMPort] | None = None,
+    mock_llm_cls: type[Any] | None = None,
+    grounding: GroundingPort | None = None,
     gen_cv_service_cls: type[GenCVService] | None = None,
 ) -> GenCVResponse:
     """Generate CV markdown+JSON using a configured LLM with deterministic mock fallback.
@@ -230,7 +231,6 @@ def gen_cv(
              (useful for tests or when the caller manages the LLM lifecycle).
     """
     resolved = resolve_dependencies(deps)
-    mock_llm_cls = mock_llm_cls or MockLLM
     gen_cv_service_cls = gen_cv_service_cls or GenCVService
     bundle = resolved.profile_repo.load_bundle(task_id, profile_id)
 
@@ -242,10 +242,11 @@ def gen_cv(
     )
     candidate_model = _candidate_input_to_profile(profile_id, candidate_input)
 
-    atoms_dir = resolved.profile_repo.atoms_dir(task_id, profile_id)
-    grounding: GroundingPort = (
-        AtomsGrounding(atoms_dir=str(atoms_dir)) if atoms_dir.is_dir() else _EmptyGrounding()
-    )
+    if mock_llm_cls is None:
+        raise RuntimeError("mock_llm_cls is required — provide MockLLM or a stub")
+
+    if grounding is None:
+        grounding = _EmptyGrounding()
 
     provider = _resolve_gen_cv_provider(bundle.task_config)
     model_name = _resolve_gen_cv_model_name(llm_model, bundle.task_config)
@@ -255,8 +256,13 @@ def gen_cv(
     if llm is not None:
         active_llm = llm
     else:
+        if build_llm_fn is None:
+            raise RuntimeError(
+                "build_llm_fn is required when llm is not provided — "
+                "pass structured_search.infra.llm.build_llm from the composition root"
+            )
         try:
-            active_llm = build_llm(provider, model_name)
+            active_llm = build_llm_fn(provider, model_name)
         except Exception as exc:
             if not allow_mock_fallback:
                 raise RuntimeError(
@@ -274,7 +280,7 @@ def gen_cv(
 
     prompt_composer = (
         resolved.prompt_composer_factory(resolved.prompts_dir)
-        if resolved.prompts_dir.exists()
+        if resolved.prompt_composer_factory is not None and resolved.prompts_dir.exists()
         else None
     )
 

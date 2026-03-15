@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 
-from structured_search.ports.loading import LoadingPort
+from structured_search.ports.loading import (
+    JsonlTextParserPort,
+    LoadingPort,
+    ParsedRecord,
+    ParseError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,27 +21,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class ParseError:
-    """A single line-level parse error from TolerantJSONLParser."""
-
-    line_no: int
-    raw_preview: str  # first 200 chars of the offending line
-    kind: str  # "json_parse" | "not_object"
-    message: str
-    consumed_lines: int = 1
-
-
-@dataclass
-class ParsedRecord:
-    """A parsed JSON object with source line metadata."""
-
-    line_no: int
-    record: dict
-    consumed_lines: int = 1
-
-
-class TolerantJSONLParser:
+class TolerantJSONLParser(JsonlTextParserPort):
     """Parse JSONL without aborting on bad lines.
 
     Handles:
