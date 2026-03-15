@@ -19,8 +19,6 @@ from structured_search.domain.gen_cv.models import (
     GeneratedCV,
     JobDescription,
 )
-from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, OllamaLLM
 from structured_search.ports.grounding import GroundingPort
 
 logger = logging.getLogger(__name__)
@@ -174,11 +172,11 @@ def _resolve_ollama_base_url() -> str:
 
 def _build_mock_cv_llm(
     *,
-    mock_llm_cls: type[MockLLM],
+    mock_llm_cls: type,
     job_model: JobDescription,
     candidate_model: CandidateAtomsProfile,
     selected_claim_ids: list[str] | None,
-) -> MockLLM:
+) -> Any:
     return mock_llm_cls(
         json_response={
             "summary": (
@@ -205,13 +203,12 @@ def gen_cv(
     allow_mock_fallback: bool = True,
     deps: ApplicationDependencies | None = None,
     ollama_llm_cls: type[Any] | None = None,
-    mock_llm_cls: type[MockLLM] | None = None,
+    mock_llm_cls: type[Any] | None = None,
+    grounding: GroundingPort | None = None,
     gen_cv_service_cls: type[GenCVService] | None = None,
 ) -> GenCVResponse:
     """Generate CV markdown+JSON using Ollama with deterministic mock fallback."""
     resolved = resolve_dependencies(deps)
-    ollama_llm_cls = ollama_llm_cls or OllamaLLM
-    mock_llm_cls = mock_llm_cls or MockLLM
     gen_cv_service_cls = gen_cv_service_cls or GenCVService
     bundle = resolved.profile_repo.load_bundle(task_id, profile_id)
 
@@ -223,10 +220,13 @@ def gen_cv(
     )
     candidate_model = _candidate_input_to_profile(profile_id, candidate_input)
 
-    atoms_dir = resolved.profile_repo.atoms_dir(task_id, profile_id)
-    grounding: GroundingPort = (
-        AtomsGrounding(atoms_dir=str(atoms_dir)) if atoms_dir.is_dir() else _EmptyGrounding()
-    )
+    if ollama_llm_cls is None:
+        raise RuntimeError("ollama_llm_cls is required — provide OllamaLLM or a stub")
+    if mock_llm_cls is None:
+        raise RuntimeError("mock_llm_cls is required — provide MockLLM or a stub")
+
+    if grounding is None:
+        grounding = _EmptyGrounding()
 
     model_name = _resolve_gen_cv_model_name(llm_model, bundle.task_config)
     ollama_base_url = _resolve_ollama_base_url()
@@ -248,7 +248,7 @@ def gen_cv(
 
     prompt_composer = (
         resolved.prompt_composer_factory(resolved.prompts_dir)
-        if resolved.prompts_dir.exists()
+        if resolved.prompt_composer_factory is not None and resolved.prompts_dir.exists()
         else None
     )
 

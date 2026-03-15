@@ -28,6 +28,7 @@ class TaskRegistry:
             raise KeyError(f"Unknown task_id: {task_id!r}") from exc
 
 
+# Default registry has plugins with build_runtime=None (metadata-only, no infra)
 _DEFAULT_REGISTRY = TaskRegistry(
     plugins={
         JOB_SEARCH_PLUGIN.task_id: JOB_SEARCH_PLUGIN,
@@ -36,6 +37,20 @@ _DEFAULT_REGISTRY = TaskRegistry(
     }
 )
 
+_ACTIVE_REGISTRY: TaskRegistry | None = None
+
+
+def configure_task_registry(registry: TaskRegistry) -> None:
+    """Replace the active registry with a fully-wired one (called by api/wiring.py)."""
+    global _ACTIVE_REGISTRY
+    _ACTIVE_REGISTRY = registry
+
+
+def clear_task_registry() -> None:
+    """Reset to default (used in tests)."""
+    global _ACTIVE_REGISTRY
+    _ACTIVE_REGISTRY = None
+
 
 def get_task_registry() -> TaskRegistry:
-    return _DEFAULT_REGISTRY
+    return _ACTIVE_REGISTRY if _ACTIVE_REGISTRY is not None else _DEFAULT_REGISTRY
