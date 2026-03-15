@@ -18,7 +18,7 @@ class _Response:
         return self._payload
 
 
-def test_task_action_gen_cv_invokes_handler_with_payload(tmp_path: Path, monkeypatch, capsys):
+def test_task_gen_cv_invokes_handler_with_payload(tmp_path: Path, monkeypatch, capsys):
     request_path = tmp_path / "request.json"
     request_path.write_text(
         json.dumps(
@@ -50,8 +50,6 @@ def test_task_action_gen_cv_invokes_handler_with_payload(tmp_path: Path, monkeyp
         [
             "task",
             "gen_cv",
-            "action",
-            "--action-name",
             "gen-cv",
             "--request",
             str(request_path),
@@ -65,7 +63,7 @@ def test_task_action_gen_cv_invokes_handler_with_payload(tmp_path: Path, monkeyp
     assert '"ok": true' in stdout
 
 
-def test_task_action_rejects_unsupported_capability(tmp_path: Path, monkeypatch):
+def test_task_gen_cv_rejects_unsupported_capability(tmp_path: Path, monkeypatch):
     request_path = tmp_path / "request.json"
     request_path.write_text("{}", encoding="utf-8")
 
@@ -81,8 +79,6 @@ def test_task_action_rejects_unsupported_capability(tmp_path: Path, monkeypatch)
         [
             "task",
             "gen_cv",
-            "action",
-            "--action-name",
             "gen-cv",
             "--request",
             str(request_path),

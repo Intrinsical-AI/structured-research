@@ -12,7 +12,7 @@ from structured_search.application.common.dependencies import (
 )
 from structured_search.application.core.task_plugin import TaskPlugin
 from structured_search.contracts import BundleSaveResponse, ProfileBundle, ValidationIssue
-from structured_search.infra.config_loader import collect_model_field_paths
+from structured_search.infra.config_loader import TaskRuntimeConfig, collect_model_field_paths
 from structured_search.ports.persistence import BundleData
 
 
@@ -110,6 +110,50 @@ def _validate_payload_type(
         model_cls.model_validate(value)
     except ValidationError as exc:
         _append_validation_errors(issues, prefix=prefix, exc=exc)
+
+
+def _validate_task_field_paths(
+    bundle: ProfileBundle, plugin: TaskPlugin, issues: list[ValidationIssue]
+) -> None:
+    """Warn when penalty/signal field paths don't exist on the record model."""
+    record_model = plugin.record_model
+    if record_model is None:
+        return
+
+    try:
+        task_cfg = TaskRuntimeConfig.model_validate(bundle.task)
+    except Exception:
+        return  # structural errors already captured by _validate_task_runtime
+
+    valid_paths = collect_model_field_paths(record_model)
+
+    def _warn_if_unknown(field_path: str, json_path: str) -> None:
+        if field_path and field_path not in valid_paths:
+            issues.append(
+                ValidationIssue(
+                    path=json_path,
+                    code="unknown_field_path",
+                    message=(
+                        f"'{field_path}' is not a declared field on record model — "
+                        "this path will always resolve to missing"
+                    ),
+                    severity="warning",
+                )
+            )
+
+    ss = task_cfg.soft_scoring
+    _warn_if_unknown(
+        ss.signal_boost.salary_field,
+        "task.soft_scoring.signal_boost.salary_field",
+    )
+    _warn_if_unknown(
+        ss.penalties.old_posting.field,
+        "task.soft_scoring.penalties.old_posting.field",
+    )
+    _warn_if_unknown(
+        ss.penalties.excess_hybrid_days.field,
+        "task.soft_scoring.penalties.excess_hybrid_days.field",
+    )
 
 
 def _validate_task_runtime(
@@ -239,6 +283,7 @@ def save_bundle(
         return BundleSaveResponse(valid=False, issues=issues)
 
     _append_rule_warnings(bundle, plugin, issues)
+    _validate_task_field_paths(bundle, plugin, issues)
 
     resolved = resolve_dependencies(deps)
     resolved.profile_repo.save_bundle(task_id, profile_id, bundle_to_data(bundle))

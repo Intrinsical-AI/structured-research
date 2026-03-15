@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ============================================================================
 # Constraint Rules (Universal)
@@ -32,16 +32,38 @@ class ConstraintRule(BaseModel):
         )
     )
     value: Any = Field(..., description="Target value(s) for the operator")
-    weight: float = Field(1.0, description="Weight for prefer/avoid rules")
+    weight: float = Field(1.0, gt=0, description="Boost weight for prefer rules (must be > 0)")
     weights: list[float] | None = Field(
-        None, description="Weights for weighted operator (must match value length)"
+        None, description="Per-value weights for 'weighted' op (must match value length)"
     )
-    neutral_if_na: bool = Field(False, description="Skip scoring if value is missing")
-    severity: float | None = Field(None, description="Penalty severity for avoid rules")
+    neutral_if_na: bool = Field(False, description="Skip scoring if field is absent or null")
+    severity: float | None = Field(
+        None, ge=0, description="Penalty magnitude for avoid rules (must be >= 0)"
+    )
     reason: str | None = Field(None, description="Human-readable reason for the constraint")
     time_decay_half_life_days: int | None = Field(
-        None, description="Time decay parameter (soft constraint)"
+        None, gt=0, description="Half-life in days for time-decay soft constraints (must be > 0)"
     )
+
+    @field_validator("field")
+    @classmethod
+    def _validate_field_path(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("'field' must be a non-empty string")
+        if v != v.strip():
+            raise ValueError(f"'field' must not have leading/trailing whitespace: {v!r}")
+        return v
+
+    @field_validator("weights")
+    @classmethod
+    def _validate_weights_positive(cls, v: list[float] | None) -> list[float] | None:
+        if v is not None:
+            non_positive = [w for w in v if w <= 0]
+            if non_positive:
+                raise ValueError(
+                    f"all 'weights' values must be > 0; got non-positive: {non_positive}"
+                )
+        return v
 
     @model_validator(mode="after")
     def _validate_operator_payload(self) -> ConstraintRule:
@@ -50,22 +72,31 @@ class ConstraintRule(BaseModel):
 
         if self.op in list_ops:
             if not isinstance(self.value, list):
-                raise ValueError(f"op '{self.op}' requires 'value' to be a list")
+                raise ValueError(
+                    f"op '{self.op}' requires 'value' to be a list, got {type(self.value).__name__}"
+                )
             if len(self.value) == 0:
                 raise ValueError(f"op '{self.op}' requires a non-empty 'value' list")
 
         if self.op in compare_ops and (
             not isinstance(self.value, (int, float)) or isinstance(self.value, bool)
         ):
-            raise ValueError(f"op '{self.op}' requires numeric 'value'")
+            raise ValueError(
+                f"op '{self.op}' requires a numeric 'value', got {type(self.value).__name__}"
+            )
 
         if self.op == "weighted":
             if self.weights is None:
-                raise ValueError("op 'weighted' requires 'weights'")
+                raise ValueError(
+                    "op 'weighted' requires 'weights' (a list of floats matching 'value' length)"
+                )
             if len(self.weights) != len(self.value):
-                raise ValueError("op 'weighted' requires len(weights) == len(value)")
+                raise ValueError(
+                    f"op 'weighted' requires len(weights) == len(value), "
+                    f"got weights={len(self.weights)} vs value={len(self.value)}"
+                )
         elif self.weights is not None:
-            raise ValueError("'weights' is only valid when op='weighted'")
+            raise ValueError(f"'weights' is only valid when op='weighted', but op='{self.op}'")
 
         return self
 

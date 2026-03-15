@@ -12,6 +12,7 @@ Current built-in tasks:
 - `job_search`: `prompt`, `jsonl_validate`, `run`
 - `product_search`: `prompt`, `jsonl_validate`, `run`
 - `gen_cv`: `action:gen-cv`
+- `vuln_triage`: `jsonl_validate`, `run`
 
 If a task does not support a capability endpoint, the API returns:
 - `422` with detail like `does not support capability ...`

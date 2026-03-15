@@ -1,6 +1,6 @@
 # structured-search — Architecture Spec
 
-> Owners: structured-search maintainers  
+> Owners: structured-search maintainers
 > Scope: Python backend (`domain`, `ports`, `infra`, `application`, `api`), filesystem profiles/runs, prompt system, and HTTP contract consumed by UI
 
 ---
