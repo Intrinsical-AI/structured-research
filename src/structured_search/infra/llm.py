@@ -178,9 +178,7 @@ class OllamaLLM(LLMPort):
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Ollama returned invalid JSON from url={url}: {raw[:200]}"
-            ) from e
+            raise RuntimeError(f"Ollama returned invalid JSON from url={url}: {raw[:200]}") from e
         message = data.get("message")
         if isinstance(message, dict):
             content = message.get("content")
@@ -221,8 +219,7 @@ class AnthropicLLM(LLMPort):
     ):
         if not _ANTHROPIC_AVAILABLE:
             raise ImportError(
-                "anthropic package not installed. "
-                "Run: pip install 'structured-search[anthropic]'"
+                "anthropic package not installed. Run: pip install 'structured-search[anthropic]'"
             )
         self.model = model
         self.temperature = temperature
@@ -241,9 +238,7 @@ class AnthropicLLM(LLMPort):
             )
             return response.content[0].text
         except Exception as e:
-            raise RuntimeError(
-                f"Anthropic generation failed for model={self.model}: {e}"
-            ) from e
+            raise RuntimeError(f"Anthropic generation failed for model={self.model}: {e}") from e
 
     def extract_json(self, prompt: str, schema: type, **kwargs: Any) -> dict:
         json_prompt = f"{prompt}\n\nRespond with valid JSON only. No markdown, no explanation."
@@ -273,8 +268,7 @@ class OpenAILLM(LLMPort):
     ):
         if not _OPENAI_AVAILABLE:
             raise ImportError(
-                "openai package not installed. "
-                "Run: pip install 'structured-search[openai]'"
+                "openai package not installed. Run: pip install 'structured-search[openai]'"
             )
         self.model = model
         self.temperature = temperature
@@ -328,8 +322,7 @@ class GeminiLLM(LLMPort):
     ):
         if not _GEMINI_AVAILABLE:
             raise ImportError(
-                "google-genai package not installed. "
-                "Run: pip install 'structured-search[gemini]'"
+                "google-genai package not installed. Run: pip install 'structured-search[gemini]'"
             )
         self.model = model
         self.temperature = temperature
@@ -411,9 +404,7 @@ class OpenRouterLLM(LLMPort):
             )
             return response.choices[0].message.content or ""
         except Exception as e:
-            raise RuntimeError(
-                f"OpenRouter generation failed for model={self.model}: {e}"
-            ) from e
+            raise RuntimeError(f"OpenRouter generation failed for model={self.model}: {e}") from e
 
     def extract_json(self, prompt: str, schema: type, **kwargs: Any) -> dict:
         json_prompt = f"{prompt}\n\nRespond with valid JSON only. No markdown, no explanation."

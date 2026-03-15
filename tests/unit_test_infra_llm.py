@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import pytest
 from pydantic import BaseModel
@@ -17,7 +18,6 @@ from structured_search.infra.llm import (
     OpenRouterLLM,
     build_llm,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -170,7 +170,7 @@ def test_anthropic_generate_calls_messages_create(monkeypatch):
         text = "anthropic response"
 
     class _FakeMessage:
-        content = [_FakeContent()]
+        content: ClassVar[list] = [_FakeContent()]
 
     class _FakeMessages:
         def create(self, **kwargs):
@@ -180,7 +180,9 @@ def test_anthropic_generate_calls_messages_create(monkeypatch):
         messages = _FakeMessages()
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
-    monkeypatch.setattr(llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})())
+    monkeypatch.setattr(
+        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+    )
 
     llm = AnthropicLLM(model="claude-sonnet-4-6", api_key="test-key")
     assert llm.generate("hello") == "anthropic response"
@@ -195,7 +197,9 @@ def test_anthropic_generate_wraps_exception(monkeypatch):
         messages = _FakeMessages()
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
-    monkeypatch.setattr(llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})())
+    monkeypatch.setattr(
+        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+    )
 
     llm = AnthropicLLM(model="claude-sonnet-4-6", api_key="key")
     with pytest.raises(RuntimeError, match="Anthropic generation failed"):
@@ -209,7 +213,7 @@ def test_anthropic_extract_json_appends_json_instruction(monkeypatch):
         text = '{"result": "ok"}'
 
     class _FakeMessage:
-        content = [_FakeContent()]
+        content: ClassVar[list] = [_FakeContent()]
 
     class _FakeMessages:
         def create(self, **kwargs):
@@ -220,7 +224,9 @@ def test_anthropic_extract_json_appends_json_instruction(monkeypatch):
         messages = _FakeMessages()
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
-    monkeypatch.setattr(llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})())
+    monkeypatch.setattr(
+        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+    )
 
     class _Schema(BaseModel):
         result: str
@@ -250,7 +256,7 @@ def test_openai_generate_calls_chat_completions(monkeypatch):
         message = _FakeMessage()
 
     class _FakeCompletion:
-        choices = [_FakeChoice()]
+        choices: ClassVar[list] = [_FakeChoice()]
 
     class _FakeCompletions:
         def create(self, **kwargs):
@@ -279,7 +285,7 @@ def test_openai_extract_json_uses_json_object_format(monkeypatch):
         message = _FakeMessage()
 
     class _FakeCompletion:
-        choices = [_FakeChoice()]
+        choices: ClassVar[list] = [_FakeChoice()]
 
     class _FakeCompletions:
         def create(self, **kwargs):
@@ -327,7 +333,9 @@ def test_gemini_generate_calls_models_generate_content(monkeypatch):
         models = _FakeModels()
 
     monkeypatch.setattr(llm_module, "_GEMINI_AVAILABLE", True)
-    monkeypatch.setattr(llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})())
+    monkeypatch.setattr(
+        llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})()
+    )
 
     llm = GeminiLLM(model="gemini-2.0-flash", api_key="key")
     assert llm.generate("hello") == "gemini response"
@@ -342,7 +350,9 @@ def test_gemini_generate_wraps_exception(monkeypatch):
         models = _FakeModels()
 
     monkeypatch.setattr(llm_module, "_GEMINI_AVAILABLE", True)
-    monkeypatch.setattr(llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})())
+    monkeypatch.setattr(
+        llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})()
+    )
 
     llm = GeminiLLM(model="m", api_key="key")
     with pytest.raises(RuntimeError, match="Gemini generation failed"):
@@ -370,7 +380,7 @@ def test_openrouter_uses_openrouter_base_url(monkeypatch):
         message = _FakeMessage()
 
     class _FakeCompletion:
-        choices = [_FakeChoice()]
+        choices: ClassVar[list] = [_FakeChoice()]
 
     class _FakeCompletions:
         def create(self, **kwargs):
@@ -406,10 +416,13 @@ def test_openrouter_injects_site_headers(monkeypatch):
                 def create(**kwargs):
                     class _M:
                         content = "ok"
+
                     class _C:
                         message = _M()
+
                     class _R:
-                        choices = [_C()]
+                        choices: ClassVar[list] = [_C()]
+
                     return _R()
 
     def _fake_openai(*, base_url, api_key, default_headers=None):
@@ -419,9 +432,7 @@ def test_openrouter_injects_site_headers(monkeypatch):
     monkeypatch.setattr(llm_module, "_OPENAI_AVAILABLE", True)
     monkeypatch.setattr(llm_module, "_OpenAI", _fake_openai)
 
-    OpenRouterLLM(
-        model="m", api_key="k", site_url="https://myapp.com", site_name="MyApp"
-    )
+    OpenRouterLLM(model="m", api_key="k", site_url="https://myapp.com", site_name="MyApp")
     assert captured["headers"]["HTTP-Referer"] == "https://myapp.com"
     assert captured["headers"]["X-Title"] == "MyApp"
 
