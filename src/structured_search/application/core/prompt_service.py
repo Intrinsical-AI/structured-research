@@ -23,6 +23,8 @@ def generate_prompt(
 ) -> PromptResponse:
     resolved = resolve_dependencies(deps)
     bundle = load_bundle(task_id=task_id, profile_id=profile_id, deps=resolved)
+    if resolved.prompt_composer_factory is None:
+        raise RuntimeError("prompt_composer_factory is not configured in ApplicationDependencies")
     composer = resolved.prompt_composer_factory(resolved.prompts_dir)
     prompt = composer.compose(task=plugin.prompt_namespace, step=step, profile=profile_id)
 

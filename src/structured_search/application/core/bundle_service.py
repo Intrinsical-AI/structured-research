@@ -10,9 +10,9 @@ from structured_search.application.common.dependencies import (
     ApplicationDependencies,
     resolve_dependencies,
 )
+from structured_search.application.common.model_utils import collect_model_field_paths
 from structured_search.application.core.task_plugin import TaskPlugin
 from structured_search.contracts import BundleSaveResponse, ProfileBundle, ValidationIssue
-from structured_search.infra.config_loader import collect_model_field_paths
 from structured_search.ports.persistence import BundleData
 
 

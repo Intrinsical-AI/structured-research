@@ -7,24 +7,28 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from structured_search.application.common.dependencies import (
+    ApplicationDependencies,
+    resolve_dependencies,
+)
 from structured_search.application.common.validation_messages import format_schema_validation_error
 from structured_search.contracts import IngestError, IngestResult, IngestStats
-from structured_search.infra.loading import TolerantJSONLParser
 
 
 def ingest_validate_jsonl(
     *,
     raw_text: str,
     record_model: type[BaseModel],
+    deps: ApplicationDependencies | None = None,
 ) -> IngestResult:
-    parser = TolerantJSONLParser()
-    parsed_valid, parse_errors = parser.parse_with_lines(raw_text)
+    resolved = resolve_dependencies(deps)
+    parsed_valid, parse_errors = resolved.jsonl_parser.parse_with_lines(raw_text)
 
     errors: list[IngestError] = [
         IngestError(
             line_no=e.line_no,
             raw_preview=e.raw_preview,
-            kind=e.kind,  # type: ignore[arg-type]
+            kind=e.kind,
             message=e.message,
         )
         for e in parse_errors
