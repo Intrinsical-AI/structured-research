@@ -13,6 +13,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from structured_search.api.wiring import (
+    configure_filesystem_dependencies,
+    configure_wired_registry,
+)
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
@@ -236,6 +240,9 @@ def _cmd_task_run_validate(args: argparse.Namespace) -> int:
             print(f"Invalid run request file: {exc}", file=sys.stderr)
             return 1
     else:
+        if args.input_path is None:
+            print("Either --request or --input is required", file=sys.stderr)
+            return 1
         input_path = Path(args.input_path)
         if not input_path.is_file():
             print(f"Input file not found: {input_path}", file=sys.stderr)
@@ -686,6 +693,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_filesystem_dependencies()
+    configure_wired_registry()
     parser = build_parser()
     args = parser.parse_args(argv)
     func = getattr(args, "func", None)
