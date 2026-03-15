@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import re
+from collections.abc import Callable
 from typing import Any
 
 from structured_search.application.common.dependencies import (
@@ -217,7 +218,8 @@ def gen_cv(
     llm_model: str | None = None,
     allow_mock_fallback: bool = True,
     deps: ApplicationDependencies | None = None,
-    ollama_llm_cls: type[Any] | None = None,
+    llm: LLMPort | None = None,
+    build_llm_fn: Callable[..., LLMPort] | None = None,
     mock_llm_cls: type[Any] | None = None,
     grounding: GroundingPort | None = None,
     gen_cv_service_cls: type[GenCVService] | None = None,
@@ -240,8 +242,6 @@ def gen_cv(
     )
     candidate_model = _candidate_input_to_profile(profile_id, candidate_input)
 
-    if ollama_llm_cls is None:
-        raise RuntimeError("ollama_llm_cls is required — provide OllamaLLM or a stub")
     if mock_llm_cls is None:
         raise RuntimeError("mock_llm_cls is required — provide MockLLM or a stub")
 
@@ -256,8 +256,13 @@ def gen_cv(
     if llm is not None:
         active_llm = llm
     else:
+        if build_llm_fn is None:
+            raise RuntimeError(
+                "build_llm_fn is required when llm is not provided — "
+                "pass structured_search.infra.llm.build_llm from the composition root"
+            )
         try:
-            active_llm = build_llm(provider, model_name)
+            active_llm = build_llm_fn(provider, model_name)
         except Exception as exc:
             if not allow_mock_fallback:
                 raise RuntimeError(

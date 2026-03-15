@@ -13,14 +13,15 @@ from structured_search.application.common.dependencies import (
 from structured_search.application.core.plugins.gen_cv import GEN_CV_PLUGIN
 from structured_search.application.core.plugins.job_search import JOB_SEARCH_PLUGIN
 from structured_search.application.core.plugins.product_search import PRODUCT_SEARCH_PLUGIN
+from structured_search.application.core.plugins.vuln_triage import VULN_TRIAGE_PLUGIN
 from structured_search.application.core.task_registry import TaskRegistry, configure_task_registry
 from structured_search.application.gen_cv.generate_cv import gen_cv
-from structured_search.contracts import CvCandidateInput, GenCVResponse
+from structured_search.contracts import CandidateInput, GenCVResponse
 from structured_search.domain.job_search.models import JobSearchConstraints
 from structured_search.domain.product_search.models import ProductSearchConstraints
 from structured_search.infra.config_loader import task_json_to_scoring_config
 from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, OllamaLLM
+from structured_search.infra.llm import MockLLM, build_llm
 from structured_search.infra.loading import TolerantJSONLParser
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
@@ -77,7 +78,7 @@ def _product_search_build_runtime(constraints_payload: dict, task_payload: dict)
 
 
 # ---------------------------------------------------------------------------
-# gen_cv action handler (infra-backed: OllamaLLM, MockLLM, AtomsGrounding)
+# gen_cv action handler (infra-backed: build_llm, MockLLM, AtomsGrounding)
 # ---------------------------------------------------------------------------
 
 
@@ -88,7 +89,7 @@ def _make_gen_cv_action_handler():
         *,
         profile_id: str,
         job: dict,
-        candidate_profile: CvCandidateInput | dict,
+        candidate_profile: CandidateInput | dict,
         selected_claim_ids: list[str] | None = None,
         llm_model: str | None = None,
         allow_mock_fallback: bool = True,
@@ -108,7 +109,7 @@ def _make_gen_cv_action_handler():
             llm_model=llm_model,
             allow_mock_fallback=allow_mock_fallback,
             deps=deps,
-            ollama_llm_cls=OllamaLLM,
+            build_llm_fn=build_llm,
             mock_llm_cls=MockLLM,
             grounding=grounding,
         )
@@ -139,6 +140,7 @@ def configure_wired_registry() -> TaskRegistry:
             JOB_SEARCH_PLUGIN_WIRED.task_id: JOB_SEARCH_PLUGIN_WIRED,
             GEN_CV_PLUGIN_WIRED.task_id: GEN_CV_PLUGIN_WIRED,
             PRODUCT_SEARCH_PLUGIN_WIRED.task_id: PRODUCT_SEARCH_PLUGIN_WIRED,
+            VULN_TRIAGE_PLUGIN.task_id: VULN_TRIAGE_PLUGIN,
         }
     )
     configure_task_registry(registry)
