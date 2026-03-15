@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from structured_search.domain import BaseConstraints, BaseResult
 
@@ -34,6 +34,19 @@ def _derive_osv_id(record_id: str | None) -> str | None:
     if _OSVISH_ID_RE.match(candidate):
         return candidate
     return None
+
+
+class VulnTriageTaskRuntimeConfig(BaseModel):
+    """Structural validation for vuln_triage task config.
+
+    Ensures required top-level keys are present and are dicts.
+    Deep field-level validation happens at scoring time via the infra layer.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    gates: dict[str, Any]
+    soft_scoring: dict[str, Any]
 
 
 class VulnTriageConstraints(BaseConstraints):

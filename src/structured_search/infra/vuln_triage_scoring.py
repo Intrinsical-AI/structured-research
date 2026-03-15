@@ -41,8 +41,8 @@ class VulnTriageSoftScoringInput(BaseModel):
     penalties: VulnTriagePenaltiesConfig = Field(default_factory=VulnTriagePenaltiesConfig)
 
 
-class VulnTriageTaskRuntimeConfig(BaseModel):
-    """Validated runtime payload for vuln_triage bundles."""
+class _VulnTriageRuntimeInput(BaseModel):
+    """Validated runtime payload for vuln_triage bundles (infra-internal)."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -64,14 +64,14 @@ class VulnTriageScoringConfig(BaseModel):
 
 
 def vuln_task_json_to_scoring_config(
-    task: dict[str, Any] | VulnTriageTaskRuntimeConfig,
+    task: dict[str, Any] | _VulnTriageRuntimeInput,
 ) -> VulnTriageScoringConfig:
     """Convert bundle.task payloads into a vuln_triage scoring config."""
 
     task_input = (
         task
-        if isinstance(task, VulnTriageTaskRuntimeConfig)
-        else VulnTriageTaskRuntimeConfig.model_validate(task)
+        if isinstance(task, _VulnTriageRuntimeInput)
+        else _VulnTriageRuntimeInput.model_validate(task)
     )
     ss = task_input.soft_scoring
     return VulnTriageScoringConfig(

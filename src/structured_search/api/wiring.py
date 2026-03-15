@@ -19,6 +19,7 @@ from structured_search.application.gen_cv.generate_cv import gen_cv
 from structured_search.contracts import CandidateInput, GenCVResponse
 from structured_search.domain.job_search.models import JobSearchConstraints
 from structured_search.domain.product_search.models import ProductSearchConstraints
+from structured_search.domain.vuln_triage.models import VulnTriageConstraints
 from structured_search.infra.config_loader import task_json_to_scoring_config
 from structured_search.infra.grounding import AtomsGrounding
 from structured_search.infra.llm import MockLLM, build_llm
@@ -29,6 +30,10 @@ from structured_search.infra.persistence_fs import (
 )
 from structured_search.infra.prompts import PromptComposer
 from structured_search.infra.scoring import HeuristicScorer
+from structured_search.infra.vuln_triage_scoring import (
+    VulnTriageScorer,
+    vuln_task_json_to_scoring_config,
+)
 from structured_search.ports.grounding import GroundingPort
 from structured_search.ports.prompting import PromptComposerPort
 
@@ -75,6 +80,12 @@ def _product_search_build_runtime(constraints_payload: dict, task_payload: dict)
     constraints = ProductSearchConstraints.model_validate(constraints_payload)
     scoring_config = task_json_to_scoring_config(task_payload)
     return constraints, HeuristicScorer(config=scoring_config)
+
+
+def _vuln_triage_build_runtime(constraints_payload: dict, task_payload: dict):
+    constraints = VulnTriageConstraints.model_validate(constraints_payload)
+    scoring_config = vuln_task_json_to_scoring_config(task_payload)
+    return constraints, VulnTriageScorer(config=scoring_config)
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +142,9 @@ PRODUCT_SEARCH_PLUGIN_WIRED = dataclasses.replace(
 GEN_CV_PLUGIN_WIRED = dataclasses.replace(
     GEN_CV_PLUGIN, action_handlers={"gen-cv": _make_gen_cv_action_handler()}
 )
+VULN_TRIAGE_PLUGIN_WIRED = dataclasses.replace(
+    VULN_TRIAGE_PLUGIN, build_runtime=_vuln_triage_build_runtime
+)
 
 
 def configure_wired_registry() -> TaskRegistry:
@@ -140,7 +154,7 @@ def configure_wired_registry() -> TaskRegistry:
             JOB_SEARCH_PLUGIN_WIRED.task_id: JOB_SEARCH_PLUGIN_WIRED,
             GEN_CV_PLUGIN_WIRED.task_id: GEN_CV_PLUGIN_WIRED,
             PRODUCT_SEARCH_PLUGIN_WIRED.task_id: PRODUCT_SEARCH_PLUGIN_WIRED,
-            VULN_TRIAGE_PLUGIN.task_id: VULN_TRIAGE_PLUGIN,
+            VULN_TRIAGE_PLUGIN_WIRED.task_id: VULN_TRIAGE_PLUGIN_WIRED,
         }
     )
     configure_task_registry(registry)
