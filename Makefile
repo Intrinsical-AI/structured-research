@@ -130,7 +130,7 @@ PROFILE ?= profile_1
 
 job-search-prompt:
 	uv run structured-search task job_search prompt \
-		--profile $(PROFILE) \
+		--profile-id $(PROFILE) \
 		--step S3_execute \
 		$(if $(OUTPUT),--output $(OUTPUT),)
 
@@ -139,7 +139,7 @@ ifndef INPUT
 	$(error INPUT is required: make job-search-run INPUT=raw.jsonl [OUTPUT=scored.jsonl] [PROFILE=profile_1])
 endif
 	uv run structured-search task job_search run \
-		--profile $(PROFILE) \
+		--profile-id $(PROFILE) \
 		--input $(INPUT) \
 		--output $(or $(OUTPUT),data/processed/jobs_scored.jsonl)
 
@@ -163,6 +163,5 @@ ifndef REQUEST
 	$(error REQUEST is required: make gen-cv REQUEST=gen_cv_request.json [OUTPUT=data/cvs/cv_response.json])
 endif
 	uv run structured-search task gen_cv action \
-		--name gen-cv \
 		--request "$(REQUEST)" \
 		> $(or $(OUTPUT),data/cvs/cv_response.json)
