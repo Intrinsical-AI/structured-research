@@ -1,0 +1,77 @@
+{
+  "task_id": "vuln_triage",
+  "profile_id": "cwe_78_focus",
+  "constraints": {
+    "domain": "vuln_triage",
+    "must": [
+      {
+        "field": "cwe_id",
+        "op": "=",
+        "value": "CWE-78"
+      }
+    ],
+    "prefer": [
+      {
+        "field": "has_code_pair",
+        "op": "=",
+        "value": true,
+        "weight": 2.0,
+        "reason": "has_code_pair"
+      },
+      {
+        "field": "trainable",
+        "op": "=",
+        "value": true,
+        "weight": 1.5,
+        "reason": "trainable"
+      },
+      {
+        "field": "language",
+        "op": "in",
+        "value": ["python", "php", "go"],
+        "weight": 1.0,
+        "reason": "common_automation_targets"
+      }
+    ],
+    "avoid": [
+      {
+        "field": "severity",
+        "op": "=",
+        "value": "LOW",
+        "severity": 1.0,
+        "reason": "low_severity"
+      }
+    ]
+  },
+  "task": {
+    "gates": {
+      "hard_filters_mode": "require_all",
+      "hard_filters": [],
+      "reject_anomalies": [],
+      "required_evidence_fields": []
+    },
+    "soft_scoring": {
+      "formula_version": "v2_soft_after_gates",
+      "prefer_weight_default": 1.0,
+      "avoid_penalty_default": 1.0,
+      "signal_boost": {
+        "evidence_present": 0.0
+      },
+      "penalties": {
+        "incomplete": 1.0,
+        "inference_used": 0.2,
+        "prompt_injection_suspected": 2.0
+      }
+    }
+  },
+  "task_config": {
+    "agent_name": "VULN_TRIAGE",
+    "version": "1.0.0",
+    "max_results": 100
+  },
+  "user_profile": {
+    "name": "CWE-78 focused vuln triage"
+  },
+  "domain_schema": null,
+  "result_schema": null
+}
