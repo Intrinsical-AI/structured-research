@@ -294,7 +294,7 @@ def gen_cv(
         if not _has_meaningful_cv_content(cv):
             raise RuntimeError("CV generation returned empty summary/highlights content")
     except Exception as exc:
-        if not allow_mock_fallback or isinstance(active_llm, mock_llm_cls):
+        if not allow_mock_fallback or fallback_used:
             raise RuntimeError(
                 "CV generation failed and mock fallback disabled: "
                 f"provider={provider}, model={model_name}, error={exc}"

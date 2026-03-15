@@ -142,7 +142,7 @@ def test_ollama_extract_json_regex_fallback(monkeypatch):
     monkeypatch.setattr(
         llm_module.urllib_request,
         "urlopen",
-        _fake_urlopen(f'{{"message":{{"content":"{raw_response}"}}}}'),
+        _fake_urlopen(json.dumps({"message": {"content": raw_response}})),
     )
 
     class _Schema(BaseModel):
@@ -181,7 +181,9 @@ def test_anthropic_generate_calls_messages_create(monkeypatch):
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
     monkeypatch.setattr(
-        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+        llm_module,
+        "_anthropic_sdk",
+        type("_sdk", (), {"Anthropic": staticmethod(lambda **_: _FakeClient())})(),
     )
 
     llm = AnthropicLLM(model="claude-sonnet-4-6", api_key="test-key")
@@ -198,7 +200,9 @@ def test_anthropic_generate_wraps_exception(monkeypatch):
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
     monkeypatch.setattr(
-        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+        llm_module,
+        "_anthropic_sdk",
+        type("_sdk", (), {"Anthropic": staticmethod(lambda **_: _FakeClient())})(),
     )
 
     llm = AnthropicLLM(model="claude-sonnet-4-6", api_key="key")
@@ -225,7 +229,9 @@ def test_anthropic_extract_json_appends_json_instruction(monkeypatch):
 
     monkeypatch.setattr(llm_module, "_ANTHROPIC_AVAILABLE", True)
     monkeypatch.setattr(
-        llm_module, "_anthropic_sdk", type("_sdk", (), {"Anthropic": lambda **_: _FakeClient()})()
+        llm_module,
+        "_anthropic_sdk",
+        type("_sdk", (), {"Anthropic": staticmethod(lambda **_: _FakeClient())})(),
     )
 
     class _Schema(BaseModel):
@@ -334,7 +340,9 @@ def test_gemini_generate_calls_models_generate_content(monkeypatch):
 
     monkeypatch.setattr(llm_module, "_GEMINI_AVAILABLE", True)
     monkeypatch.setattr(
-        llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})()
+        llm_module,
+        "_genai",
+        type("_sdk", (), {"Client": staticmethod(lambda **_: _FakeClient())})(),
     )
 
     llm = GeminiLLM(model="gemini-2.0-flash", api_key="key")
@@ -351,7 +359,9 @@ def test_gemini_generate_wraps_exception(monkeypatch):
 
     monkeypatch.setattr(llm_module, "_GEMINI_AVAILABLE", True)
     monkeypatch.setattr(
-        llm_module, "_genai", type("_sdk", (), {"Client": lambda **_: _FakeClient()})()
+        llm_module,
+        "_genai",
+        type("_sdk", (), {"Client": staticmethod(lambda **_: _FakeClient())})(),
     )
 
     llm = GeminiLLM(model="m", api_key="key")

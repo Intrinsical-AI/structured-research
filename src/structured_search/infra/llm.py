@@ -25,6 +25,7 @@ try:
 
     _ANTHROPIC_AVAILABLE = True
 except ImportError:
+    _anthropic_sdk = None  # type: ignore[assignment]
     _ANTHROPIC_AVAILABLE = False
 
 try:
@@ -32,6 +33,7 @@ try:
 
     _OPENAI_AVAILABLE = True
 except ImportError:
+    _OpenAI = None  # type: ignore[assignment,misc]
     _OPENAI_AVAILABLE = False
 
 try:
@@ -39,6 +41,7 @@ try:
 
     _GEMINI_AVAILABLE = True
 except ImportError:
+    _genai = None  # type: ignore[assignment]
     _GEMINI_AVAILABLE = False
 
 
