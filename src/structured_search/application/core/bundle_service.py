@@ -120,14 +120,13 @@ def _validate_task_field_paths(
     if record_model is None:
         return
 
-    try:
-        task_cfg = TaskRuntimeConfig.model_validate(bundle.task)
-    except Exception:
+    soft_scoring = bundle.task.get("soft_scoring")
+    if not isinstance(soft_scoring, dict):
         return  # structural errors already captured by _validate_task_runtime
 
     valid_paths = collect_model_field_paths(record_model)
 
-    def _warn_if_unknown(field_path: str, json_path: str) -> None:
+    def _warn_if_unknown(field_path: str | None, json_path: str) -> None:
         if field_path and field_path not in valid_paths:
             issues.append(
                 ValidationIssue(
@@ -141,17 +140,21 @@ def _validate_task_field_paths(
                 )
             )
 
-    ss = task_cfg.soft_scoring
+    signal_boost = soft_scoring.get("signal_boost") or {}
+    penalties = soft_scoring.get("penalties") or {}
+    old_posting = penalties.get("old_posting") or {}
+    excess_hybrid_days = penalties.get("excess_hybrid_days") or {}
+
     _warn_if_unknown(
-        ss.signal_boost.salary_field,
+        signal_boost.get("salary_field"),
         "task.soft_scoring.signal_boost.salary_field",
     )
     _warn_if_unknown(
-        ss.penalties.old_posting.field,
+        old_posting.get("field"),
         "task.soft_scoring.penalties.old_posting.field",
     )
     _warn_if_unknown(
-        ss.penalties.excess_hybrid_days.field,
+        excess_hybrid_days.get("field"),
         "task.soft_scoring.penalties.excess_hybrid_days.field",
     )
 

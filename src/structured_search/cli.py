@@ -17,6 +17,7 @@ from structured_search.api.wiring import (
     configure_filesystem_dependencies,
     configure_wired_registry,
 )
+from structured_search.application.core.bundle_service import list_profiles
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
