@@ -16,8 +16,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ollama = ["langchain-ollama>=0.2"]
-api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "langchain-ollama>=0.2"]
+# Provider extras — install only what you use
+ollama = []                                                     # no extra deps; uses stdlib urllib
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.50"]
+gemini = ["google-genai>=1.0"]
+openrouter = ["openai>=1.50"]                                   # reuses OpenAI SDK as HTTP client
+all-llm = ["anthropic>=0.40", "openai>=1.50", "google-genai>=1.0"]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 
 [project.scripts]
 structured-search = "structured_search.cli:main"
@@ -61,5 +67,9 @@ python_version = "3.12"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["fastapi", "fastapi.*", "uvicorn", "langchain_ollama"]
+module = ["fastapi", "fastapi.*", "uvicorn"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["anthropic", "anthropic.*", "openai", "openai.*", "google.genai", "google.genai.*"]
 ignore_missing_imports = true

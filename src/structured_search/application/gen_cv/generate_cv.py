@@ -20,8 +20,9 @@ from structured_search.domain.gen_cv.models import (
     JobDescription,
 )
 from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, OllamaLLM
+from structured_search.infra.llm import MockLLM, build_llm
 from structured_search.ports.grounding import GroundingPort
+from structured_search.ports.llm import LLMPort
 
 logger = logging.getLogger(__name__)
 
@@ -158,18 +159,32 @@ def _task_config_llm_model(task_config: dict[str, Any]) -> str | None:
     return _as_non_empty_str(llm_cfg.get("model"))
 
 
-def _resolve_gen_cv_model_name(requested_model: str | None, task_config: dict[str, Any]) -> str:
+def _task_config_llm_provider(task_config: dict[str, Any]) -> str | None:
+    runtime = task_config.get("runtime")
+    if not isinstance(runtime, dict):
+        return None
+    llm_cfg = runtime.get("llm")
+    if not isinstance(llm_cfg, dict):
+        return None
+    return _as_non_empty_str(llm_cfg.get("provider"))
+
+
+def _resolve_gen_cv_model_name(
+    requested_model: str | None, task_config: dict[str, Any]
+) -> str | None:
     return (
         _as_non_empty_str(requested_model)
         or _as_non_empty_str(os.getenv("STRUCTURED_SEARCH_LLM_MODEL"))
-        or _as_non_empty_str(os.getenv("OLLAMA_MODEL"))
         or _task_config_llm_model(task_config)
-        or "lfm2.5-thinking"
     )
 
 
-def _resolve_ollama_base_url() -> str:
-    return _as_non_empty_str(os.getenv("OLLAMA_BASE_URL")) or "http://localhost:11434"
+def _resolve_gen_cv_provider(task_config: dict[str, Any]) -> str:
+    return (
+        _as_non_empty_str(os.getenv("STRUCTURED_SEARCH_LLM_PROVIDER"))
+        or _task_config_llm_provider(task_config)
+        or "ollama"
+    )
 
 
 def _build_mock_cv_llm(
@@ -186,8 +201,8 @@ def _build_mock_cv_llm(
                 f"{job_model.title} at {job_model.company}."
             ),
             "highlights": [
-                "Profile generated in fallback mode (no local Ollama).",
-                "Review and regenerate with local LLM for production quality.",
+                "Profile generated in fallback mode (no LLM available).",
+                "Review and regenerate with a configured LLM for production quality.",
             ],
             "cited_claim_ids": selected_claim_ids or [],
         }
@@ -204,13 +219,17 @@ def gen_cv(
     llm_model: str | None = None,
     allow_mock_fallback: bool = True,
     deps: ApplicationDependencies | None = None,
-    ollama_llm_cls: type[Any] | None = None,
+    llm: LLMPort | None = None,
     mock_llm_cls: type[MockLLM] | None = None,
     gen_cv_service_cls: type[GenCVService] | None = None,
 ) -> GenCVResponse:
-    """Generate CV markdown+JSON using Ollama with deterministic mock fallback."""
+    """Generate CV markdown+JSON using a configured LLM with deterministic mock fallback.
+
+    Args:
+        llm: Pre-built LLMPort instance. When provided, skips provider/model resolution
+             (useful for tests or when the caller manages the LLM lifecycle).
+    """
     resolved = resolve_dependencies(deps)
-    ollama_llm_cls = ollama_llm_cls or OllamaLLM
     mock_llm_cls = mock_llm_cls or MockLLM
     gen_cv_service_cls = gen_cv_service_cls or GenCVService
     bundle = resolved.profile_repo.load_bundle(task_id, profile_id)
@@ -228,23 +247,30 @@ def gen_cv(
         AtomsGrounding(atoms_dir=str(atoms_dir)) if atoms_dir.is_dir() else _EmptyGrounding()
     )
 
+    provider = _resolve_gen_cv_provider(bundle.task_config)
     model_name = _resolve_gen_cv_model_name(llm_model, bundle.task_config)
-    ollama_base_url = _resolve_ollama_base_url()
-    try:
-        llm = ollama_llm_cls(model=model_name, base_url=ollama_base_url)
-    except Exception as exc:
-        if not allow_mock_fallback:
-            raise RuntimeError(
-                "Ollama unavailable and mock fallback disabled: "
-                f"model={model_name}, base_url={ollama_base_url}, error={exc}"
-            ) from exc
-        logger.warning("Ollama unavailable, using MockLLM fallback: %s", exc)
-        llm = _build_mock_cv_llm(
-            mock_llm_cls=mock_llm_cls,
-            job_model=job_model,
-            candidate_model=candidate_model,
-            selected_claim_ids=selected_claim_ids,
-        )
+
+    fallback_used = False
+    active_llm: LLMPort
+    if llm is not None:
+        active_llm = llm
+    else:
+        try:
+            active_llm = build_llm(provider, model_name)
+        except Exception as exc:
+            if not allow_mock_fallback:
+                raise RuntimeError(
+                    "LLM unavailable and mock fallback disabled: "
+                    f"provider={provider}, model={model_name}, error={exc}"
+                ) from exc
+            logger.warning("LLM unavailable, using MockLLM fallback: %s", exc)
+            active_llm = _build_mock_cv_llm(
+                mock_llm_cls=mock_llm_cls,
+                job_model=job_model,
+                candidate_model=candidate_model,
+                selected_claim_ids=selected_claim_ids,
+            )
+            fallback_used = True
 
     prompt_composer = (
         resolved.prompt_composer_factory(resolved.prompts_dir)
@@ -252,9 +278,9 @@ def gen_cv(
         else None
     )
 
-    def _generate_with_llm(active_llm: Any) -> GeneratedCV:
+    def _generate_with_llm(active: LLMPort) -> GeneratedCV:
         return gen_cv_service_cls(
-            llm=active_llm,
+            llm=active,
             grounding=grounding,
             prompt_composer=prompt_composer,
         ).generate(
@@ -264,34 +290,35 @@ def gen_cv(
         )
 
     try:
-        cv = _generate_with_llm(llm)
+        cv = _generate_with_llm(active_llm)
         if not _has_meaningful_cv_content(cv):
             raise RuntimeError("CV generation returned empty summary/highlights content")
     except Exception as exc:
-        if not allow_mock_fallback or isinstance(llm, mock_llm_cls):
+        if not allow_mock_fallback or isinstance(active_llm, mock_llm_cls):
             raise RuntimeError(
                 "CV generation failed and mock fallback disabled: "
-                f"model={model_name}, base_url={ollama_base_url}, error={exc}"
+                f"provider={provider}, model={model_name}, error={exc}"
             ) from exc
         logger.warning(
-            "Ollama generation failed, retrying with MockLLM fallback: "
-            "model=%s, base_url=%s, error=%s",
+            "LLM generation failed, retrying with MockLLM fallback: "
+            "provider=%s, model=%s, error=%s",
+            provider,
             model_name,
-            ollama_base_url,
             exc,
         )
-        llm = _build_mock_cv_llm(
+        active_llm = _build_mock_cv_llm(
             mock_llm_cls=mock_llm_cls,
             job_model=job_model,
             candidate_model=candidate_model,
             selected_claim_ids=selected_claim_ids,
         )
+        fallback_used = True
         try:
-            cv = _generate_with_llm(llm)
+            cv = _generate_with_llm(active_llm)
         except Exception as fallback_error:
             raise RuntimeError(
                 "CV generation failed even with mock fallback: "
-                f"model={model_name}, base_url={ollama_base_url}, error={fallback_error}"
+                f"provider={provider}, model={model_name}, error={fallback_error}"
             ) from fallback_error
 
     cv_json = cv.model_dump(mode="json")
@@ -301,10 +328,11 @@ def gen_cv(
         cv_markdown=markdown,
         generated_cv_json=cv_json,
         model_info={
-            "model": cv_json.get("model_used") or getattr(llm, "model", "mock"),
+            "model": cv_json.get("model_used") or getattr(active_llm, "model", "mock"),
+            "provider": provider if not fallback_used else "mock",
             "grounded_claim_count": len(cv_json.get("grounded_claim_ids") or []),
             "profile_id": profile_id,
             "markdown_hash": hashlib.sha256(markdown.encode("utf-8")).hexdigest(),
-            "fallback_used": isinstance(llm, mock_llm_cls),
+            "fallback_used": fallback_used,
         },
     )

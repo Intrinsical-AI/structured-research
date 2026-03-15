@@ -2,7 +2,15 @@
 
 from structured_search.infra.exporting import JSONLExporter, MockExporter
 from structured_search.infra.grounding import AtomsGrounding
-from structured_search.infra.llm import MockLLM, OllamaLLM
+from structured_search.infra.llm import (
+    AnthropicLLM,
+    GeminiLLM,
+    MockLLM,
+    OllamaLLM,
+    OpenAILLM,
+    OpenRouterLLM,
+    build_llm,
+)
 from structured_search.infra.loading import JSONLLoader, MockLoader
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
@@ -18,10 +26,12 @@ from structured_search.infra.scoring_config import (
 )
 
 __all__ = [
+    "AnthropicLLM",
     "AtomsGrounding",
     "FilesystemProfileRepository",
     "FilesystemRunRepository",
     "GatesConfig",
+    "GeminiLLM",
     "HeuristicScorer",
     "JSONLExporter",
     "JSONLLoader",
@@ -30,8 +40,11 @@ __all__ = [
     "MockLoader",
     "MockScorer",
     "OllamaLLM",
+    "OpenAILLM",
+    "OpenRouterLLM",
     "PenaltiesConfig",
     "PromptComposer",
     "SignalBoostConfig",
     "SoftScoringConfig",
+    "build_llm",
 ]
