@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from structured_search.api.wiring import JOB_SEARCH_PLUGIN_WIRED as _PLUGIN
 from structured_search.application.common.dependencies import (
     ApplicationDependencies,
     clear_configured_dependencies,
@@ -14,15 +15,14 @@ from structured_search.application.core.bundle_service import (
     load_bundle,
     save_bundle,
 )
-from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle
+from structured_search.infra.loading import TolerantJSONLParser
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
 )
 
 _TASK_ID = "job_search"
-_PLUGIN = get_task_registry().get(_TASK_ID)
 
 
 def _minimal_constraints() -> dict:
@@ -68,6 +68,7 @@ def test_service_functions_accept_explicit_dependencies(tmp_path):
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=FilesystemRunRepository(base_dir=tmp_path / "runs"),
         prompts_dir=Path("resources/prompts"),
+        jsonl_parser=TolerantJSONLParser(),
     )
 
     bundle = _minimal_bundle()
@@ -93,6 +94,7 @@ def test_configure_dependencies_enables_injected_runtime_wiring(tmp_path):
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=FilesystemRunRepository(base_dir=tmp_path / "runs"),
         prompts_dir=Path("resources/prompts"),
+        jsonl_parser=TolerantJSONLParser(),
     )
     try:
         bundle = _minimal_bundle(profile_id="startup-profile")

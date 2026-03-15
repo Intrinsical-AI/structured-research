@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from structured_search.api.wiring import JOB_SEARCH_PLUGIN_WIRED as _PLUGIN
+from structured_search.api.wiring import default_prompt_composer_factory
 from structured_search.application.common.dependencies import ApplicationDependencies
 from structured_search.application.core.bundle_service import (
     list_profiles,
@@ -13,8 +15,8 @@ from structured_search.application.core.bundle_service import (
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
 from structured_search.application.core.prompt_service import generate_prompt
 from structured_search.application.core.run_service import run_score, validate_run
-from structured_search.application.core.task_registry import get_task_registry
 from structured_search.contracts import ProfileBundle, RunScoreRequest
+from structured_search.infra.loading import TolerantJSONLParser
 from structured_search.infra.persistence_fs import (
     FilesystemProfileRepository,
     FilesystemRunRepository,
@@ -22,7 +24,6 @@ from structured_search.infra.persistence_fs import (
 from structured_search.ports.persistence import BundleData, RunRepository, SnapshotWriteResult
 
 _TASK_ID = "job_search"
-_PLUGIN = get_task_registry().get(_TASK_ID)
 
 
 def _minimal_constraints() -> dict:
@@ -98,6 +99,8 @@ def _deps(tmp_path: Path) -> ApplicationDependencies:
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=FilesystemRunRepository(base_dir=tmp_path / "runs"),
         prompts_dir=Path("resources/prompts"),
+        jsonl_parser=TolerantJSONLParser(),
+        prompt_composer_factory=default_prompt_composer_factory,
     )
 
 
@@ -237,6 +240,7 @@ def test_validate_run_reports_not_runnable_when_required_snapshot_io_fails(tmp_p
         profile_repo=FilesystemProfileRepository(base_dir=tmp_path / "profiles"),
         run_repo=_FailingRunRepository(),
         prompts_dir=Path("resources/prompts"),
+        jsonl_parser=TolerantJSONLParser(),
     )
     bundle = _minimal_bundle(profile_id="profile_example")
     save_bundle(
@@ -262,3 +266,63 @@ def test_validate_run_reports_not_runnable_when_required_snapshot_io_fails(tmp_p
     assert result.checks.snapshot_io_checked is True
     assert result.checks.snapshot_io_writable is False
     assert result.snapshot_probe_error == "disk full"
+
+
+def test_validate_run_reports_profile_not_found(tmp_path: Path):
+    deps = _deps(tmp_path)
+
+    result = validate_run(
+        task_id=_TASK_ID,
+        request=RunScoreRequest(
+            profile_id="nonexistent_profile",
+            records=[_minimal_posting_dict(1)],
+            require_snapshot=True,
+        ),
+        plugin=_PLUGIN,
+        deps=deps,
+    )
+
+    assert result.ok is False
+    assert result.checks.profile_exists is False
+    assert result.checks.constraints_valid is False
+    assert result.checks.snapshot_io_checked is False
+
+
+def test_validate_run_reports_invalid_scoring_config(tmp_path: Path):
+    from structured_search.ports.persistence import BundleData
+
+    deps = _deps(tmp_path)
+    # Save a bundle directly (bypassing save_bundle validation) with an invalid
+    # `op` value that will fail JobSearchConstraints.model_validate at build_runtime time.
+    deps.profile_repo.save_bundle(
+        _TASK_ID,
+        "bad_config_profile",
+        BundleData(
+            constraints={
+                "domain": "job_search",
+                "must": [{"field": "modality", "op": "INVALID_OP", "value": "remote"}],
+                "prefer": [],
+                "avoid": [],
+            },
+            task=_minimal_task(),
+            task_config={},
+            user_profile=None,
+        ),
+    )
+
+    result = validate_run(
+        task_id=_TASK_ID,
+        request=RunScoreRequest(
+            profile_id="bad_config_profile",
+            records=[_minimal_posting_dict(1)],
+            require_snapshot=False,
+        ),
+        plugin=_PLUGIN,
+        deps=deps,
+    )
+
+    assert result.ok is False
+    assert result.checks.profile_exists is True
+    assert result.checks.constraints_valid is False
+    assert result.checks.scoring_config_valid is False
+    assert result.checks.snapshot_io_checked is False

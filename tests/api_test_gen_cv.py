@@ -108,12 +108,12 @@ def test_gen_cv_runtime_error_returns_503(monkeypatch):
 
 
 def test_gen_cv_can_disable_mock_fallback(monkeypatch):
-    import structured_search.application.gen_cv.generate_cv as gen_cv_app
+    import structured_search.api.wiring as wiring_module
 
     def _boom(*_args, **_kwargs):
         raise RuntimeError("ollama down")
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _boom)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _boom)
     request = GenCVRequest(
         profile_id="profile_example",
         job=_minimal_job(),
@@ -127,6 +127,7 @@ def test_gen_cv_can_disable_mock_fallback(monkeypatch):
 
 
 def test_gen_cv_falls_back_when_ollama_generation_fails(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     class _FakeOllama:
@@ -135,7 +136,7 @@ def test_gen_cv_falls_back_when_ollama_generation_fails(monkeypatch):
             self.base_url = base_url
 
     def _fake_generate(self, job, candidate, allowed_claim_ids=None):
-        if isinstance(self.llm, gen_cv_app.MockLLM):
+        if isinstance(self.llm, wiring_module.MockLLM):
             return GeneratedCV(
                 id=f"{job.id}__{candidate.id}",
                 source="mock-llm",
@@ -146,7 +147,7 @@ def test_gen_cv_falls_back_when_ollama_generation_fails(monkeypatch):
             )
         raise RuntimeError("model not found")
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
@@ -161,6 +162,7 @@ def test_gen_cv_falls_back_when_ollama_generation_fails(monkeypatch):
 
 
 def test_gen_cv_falls_back_when_ollama_returns_empty_content(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     class _FakeOllama:
@@ -169,7 +171,7 @@ def test_gen_cv_falls_back_when_ollama_returns_empty_content(monkeypatch):
             self.base_url = base_url
 
     def _fake_generate(self, job, candidate, allowed_claim_ids=None):
-        if isinstance(self.llm, gen_cv_app.MockLLM):
+        if isinstance(self.llm, wiring_module.MockLLM):
             return GeneratedCV(
                 id=f"{job.id}__{candidate.id}",
                 source="mock-llm",
@@ -189,7 +191,7 @@ def test_gen_cv_falls_back_when_ollama_returns_empty_content(monkeypatch):
             grounded_claim_ids=allowed_claim_ids or [],
         )
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
@@ -204,6 +206,7 @@ def test_gen_cv_falls_back_when_ollama_returns_empty_content(monkeypatch):
 
 
 def test_gen_cv_falls_back_when_ollama_returns_placeholder_content(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     class _FakeOllama:
@@ -212,7 +215,7 @@ def test_gen_cv_falls_back_when_ollama_returns_placeholder_content(monkeypatch):
             self.base_url = base_url
 
     def _fake_generate(self, job, candidate, allowed_claim_ids=None):
-        if isinstance(self.llm, gen_cv_app.MockLLM):
+        if isinstance(self.llm, wiring_module.MockLLM):
             return GeneratedCV(
                 id=f"{job.id}__{candidate.id}",
                 source="mock-llm",
@@ -232,7 +235,7 @@ def test_gen_cv_falls_back_when_ollama_returns_placeholder_content(monkeypatch):
             grounded_claim_ids=allowed_claim_ids or [],
         )
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
@@ -277,6 +280,7 @@ def test_gen_cv_passes_selected_claim_ids_to_service_generate(monkeypatch):
 
 
 def test_gen_cv_passes_llm_model_to_ollama(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     captured: dict[str, str | None] = {"llm_model": None}
@@ -297,7 +301,7 @@ def test_gen_cv_passes_llm_model_to_ollama(monkeypatch):
             grounded_claim_ids=allowed_claim_ids or [],
         )
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
@@ -311,6 +315,7 @@ def test_gen_cv_passes_llm_model_to_ollama(monkeypatch):
 
 
 def test_gen_cv_preserves_availability_days_zero(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     captured: dict[str, int | None] = {"availability_days": None}
@@ -331,7 +336,7 @@ def test_gen_cv_preserves_availability_days_zero(monkeypatch):
             grounded_claim_ids=allowed_claim_ids or [],
         )
 
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(
@@ -348,6 +353,7 @@ def test_gen_cv_preserves_availability_days_zero(monkeypatch):
 
 
 def test_gen_cv_uses_env_model_and_base_url_when_not_provided(monkeypatch):
+    import structured_search.api.wiring as wiring_module
     import structured_search.application.gen_cv.generate_cv as gen_cv_app
 
     captured: dict[str, str | None] = {"llm_model": None, "base_url": None}
@@ -371,7 +377,7 @@ def test_gen_cv_uses_env_model_and_base_url_when_not_provided(monkeypatch):
     monkeypatch.delenv("STRUCTURED_SEARCH_LLM_MODEL", raising=False)
     monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5:latest")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    monkeypatch.setattr(gen_cv_app, "OllamaLLM", _FakeOllama)
+    monkeypatch.setattr(wiring_module, "OllamaLLM", _FakeOllama)
     monkeypatch.setattr(gen_cv_app.GenCVService, "generate", _fake_generate)
 
     request = GenCVRequest(

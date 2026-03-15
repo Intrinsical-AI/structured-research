@@ -8,11 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from structured_search.api.wiring import JOB_SEARCH_PLUGIN_WIRED as _PLUGIN
 from structured_search.application.core.ingest_service import ingest_validate_jsonl
-from structured_search.application.core.task_registry import get_task_registry
 from structured_search.infra.loading import TolerantJSONLParser
-
-_PLUGIN = get_task_registry().get("job_search")
 
 _MINIMAL_POSTING = {
     "id": "test-001",
